@@ -1,0 +1,8 @@
+{
+  "name": "ANODE localhost",
+  "port": 8000,
+  "max": 16,
+  "motd": "",
+  "autosave_sec": 60,
+  "open_browser": false
+}

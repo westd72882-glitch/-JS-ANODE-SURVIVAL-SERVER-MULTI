@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: osil-survival
+    runtime: python
+    plan: starter            # для сохранения мира нужен платный план + диск
+    buildCommand: echo ok
+    startCommand: python server.py
+    envVars:
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: osil-data
+      mountPath: /data
+      sizeGB: 1
