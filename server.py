@@ -224,7 +224,7 @@ DB.executescript('''CREATE TABLE IF NOT EXISTS donations(u TEXT, item TEXT, PRIM
 CREATE TABLE IF NOT EXISTS xp(u TEXT PRIMARY KEY, v INTEGER);
 CREATE TABLE IF NOT EXISTS promocodes(code TEXT PRIMARY KEY, coins INTEGER, item TEXT, uses INTEGER, used INTEGER);''')
 SHOP = {'copter': 420, 'quarry': 1200}; SHOPL = threading.Lock()
-def owned(u): return sorted(SHOP) if wallet(u)['admin'] else [r[0] for r in qa('SELECT item FROM donations WHERE u=?', (u,))]
+def owned(u): return sorted(r[0] for r in qa('SELECT item FROM donations WHERE u=?', (u,)))   # админы тоже получают предметы только через покупку/выдачу
 def owns(u, item): return item in owned(u)
 def add_xp(u, n):
     if u and n: q('INSERT INTO xp(u,v) VALUES(?,?) ON CONFLICT(u) DO UPDATE SET v=xp.v+excluded.v', (u, int(n)))
