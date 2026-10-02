@@ -800,3 +800,15 @@ body.hud-off #hud-bars, body.hud-off #hotbar, body.hud-off #minimap, body.hud-of
 #dn-get{ flex:none; padding:8px 16px; border:0; background:#5b7a2e; color:#fff; font:900 16px/1.1 'Roboto Condensed',Arial,sans-serif; letter-spacing:.5px; cursor:pointer; } #dn-get small{ font-size:15px; }
 
 #start-screen .m-coins i, .m-coins i{ background:var(--coin) center/contain no-repeat !important; width:18px; height:18px; }
+
+/* донат: панели/надписи помещаются на любом экране */
+.sh-title{ font-size:clamp(16px,4.2vh,26px); }
+.sh-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; }
+.sh-card{ width:auto; height:clamp(120px,36vh,180px); min-width:0; }
+.sh-price{ font-size:clamp(14px,3.6vh,22px); top:5px; right:6px; max-width:calc(100% - 10px); }
+.sh-card.own .sh-price{ font-size:clamp(11px,2.8vh,15px); }
+.sh-img{ width:56%; height:auto; max-height:52%; top:44%; }
+.sh-name{ font-size:clamp(12px,3.2vh,20px); max-width:94%; text-align:center; white-space:normal; overflow-wrap:anywhere; line-height:1.05; margin-bottom:6px; }
+.sh-bar{ flex-wrap:wrap; }
+.sh-info{ flex:1 1 180px; min-width:0; font-size:clamp(11px,2.8vh,13px); }
+#dn-get{ flex:0 1 auto; max-width:100%; padding:6px 12px; font-size:clamp(12px,3.4vh,16px); white-space:normal; text-align:center; } #dn-get small{ font-size:.85em; }
