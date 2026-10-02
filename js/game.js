@@ -5604,8 +5604,12 @@ let _loopPending = false;
 const _mc = new MessageChannel();
 _mc.port1.onmessage = ()=>{ _loopPending=false; animate(); };
 function scheduleNext(){
-  if(FPS_UNLIMITED && !document.hidden){ if(!_loopPending){ _loopPending=true; _mc.port2.postMessage(0); } }   // без привязки к vsync
-  else requestAnimationFrame(animate);
+  if(document.hidden || !FPS_UNLIMITED){ requestAnimationFrame(animate); return; }   // 30 FPS и фон: обычный rAF
+  if(_loopPending) return;
+  _loopPending = true;                                  // без привязки к vsync (60/90/без лимита)
+  const rem = FPS_CAP_MS ? FPS_CAP_MS - (performance.now() - lastTime) : 0;
+  if(rem > 3) setTimeout(()=>_mc.port2.postMessage(0), rem - 2);   // спим, чтобы не жечь батарею, последние мс — точный пейсинг
+  else _mc.port2.postMessage(0);
 }
 /* ================= Дорога, бочки, заправка, Агропром, боты ================= */
 function roadZ(x){ return 0.04*WORLD_SIZE*Math.sin(x/WORLD_SIZE*7.5); }
@@ -6154,10 +6158,10 @@ function updateSeaSound(dt){
 
 function animate(){
   scheduleNext();
-  const now = performance.now();
-  if(FPS_CAP_MS && now-lastTime < FPS_CAP_MS) return;      // свой лимит (30/60/90); «Без лимита» = частота экрана
-  const dt = Math.min(0.05, (now-lastTime)/1000);
-  lastTime = now;
+  const now = performance.now(), el = now - lastTime;
+  if(FPS_CAP_MS && el < FPS_CAP_MS - (FPS_UNLIMITED ? 0.3 : 2)) return;   // свой лимит (30/60/90); «Без лимита» = частота экрана
+  const dt = Math.min(0.05, el/1000);
+  lastTime = (FPS_CAP_MS && el < FPS_CAP_MS*2) ? lastTime + FPS_CAP_MS : now;   // без дрейфа: ровные кадры, а не 30–40 «через раз»
   updateFPS(now);
 
   if(!document.getElementById('start-screen').classList.contains('hidden')) {
@@ -6376,7 +6380,7 @@ function applySetting(k){
     SHADOW_R2 = (sd*1.2)*(sd*1.2); shadowDirty = true; updateCulling(0,true);
   }
   if(on('shadows') || on('shadowDist')){ SHADOW_TEXEL = (sun.shadow.camera.right*2)/sun.shadow.mapSize.x; }
-  if(on('fpsCap')){ const v=[30,60,90,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v - 2 : 0; const u=(v===0||v===90); if(u && !FPS_UNLIMITED){ FPS_UNLIMITED=true; } else if(!u){ FPS_UNLIMITED=false; } }
+  if(on('fpsCap')){ const v=[30,60,90,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v : 0; const u=(v!==30); if(u && !FPS_UNLIMITED){ FPS_UNLIMITED=true; } else if(!u){ FPS_UNLIMITED=false; } }
   if(on('dist')){
     const far = Math.min(CFG.dist, FOG_MAX);   // туман гарантированно закрывает всё дальше FOG_MAX: ни ряби, ни пустоты под миром
     scene.fog.near = far*0.18; scene.fog.far = far; camera.far = far+10; camera.updateProjectionMatrix();
