@@ -217,6 +217,72 @@ def api_auth(kind, d, ip):
     q('UPDATE accounts SET last_login=?, last_ip=? WHERE u=?', (time.time(), ip, r[0][0])); print(f'* вход: {r[0][0]} ({ip})')
     return 200, {'token': new_session(r[0][0], ip), 'u': r[0][0]}
 
+
+# ---------------- кошелёк, промокоды, админ-панель (всё в БД) ----------------
+DB.executescript('''CREATE TABLE IF NOT EXISTS wallet(u TEXT PRIMARY KEY, coins INTEGER DEFAULT 0, admin INTEGER DEFAULT 0, promos TEXT DEFAULT '');''')
+PROMOS = {'OSIL2026': 100, 'RUSTLIKE': 50, 'TESTER': 25}; ADMIN_CODE, ADMIN_COINS = 'ADMIN6737', 1000
+def wallet(u):
+    q('INSERT OR IGNORE INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?)', (u, ''))
+    r = qa('SELECT coins,admin,promos FROM wallet WHERE u=?', (u,))[0]; return {'coins': r[0] or 0, 'admin': bool(r[1]), 'promos': [x for x in (r[2] or '').split(',') if x]}
+def level_of(kills, playtime): return 1 + int(math.sqrt(max(0, (playtime or 0) / 60.0 * 2 + (kills or 0) * 10)))
+def me_info(u):
+    w = wallet(u); p = qa('SELECT kills,playtime FROM players WHERE tok=?', (u,)); k, pt = (p[0] if p else (0, 0))
+    return {'u': u, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(k, pt)}
+def api_promo(d):
+    u = session_user(d.get('token'))
+    if not u: return 401, {'error': 'Войдите в аккаунт на сервере'}
+    code = str(d.get('code', '')).strip().upper().replace('АДМИН', 'ADMIN'); w = wallet(u)
+    if code == ADMIN_CODE:
+        msg = 'Админ-панель открыта (Настройки → Админ)'
+        if code not in w['promos']: q('UPDATE wallet SET coins=coins+?, admin=1, promos=? WHERE u=?', (ADMIN_COINS, ','.join(w['promos'] + [code]), u)); msg += f', +{ADMIN_COINS} монет'
+        else: q('UPDATE wallet SET admin=1 WHERE u=?', (u,))
+        print(f'* {u} активировал админ-код'); return 200, {'msg': msg, **me_info(u)}
+    if code in w['promos']: return 200, {'error': 'Код уже использован'}
+    if code not in PROMOS: return 200, {'error': 'Неверный код'}
+    q('UPDATE wallet SET coins=coins+?, promos=? WHERE u=?', (PROMOS[code], ','.join(w['promos'] + [code]), u)); return 200, {'msg': f'+{PROMOS[code]} монет!', **me_info(u)}
+def kick_user(u, msg):
+    c = find_client(u)
+    if c: c.send({'t': 'kick', 'm': msg}); c.tok = ''; c.kick()
+def api_admin(d):
+    me = session_user(d.get('token'))
+    if not me or not wallet(me)['admin']: return 403, {'error': 'Нет доступа'}
+    op, tg = str(d.get('op', 'list')), str(d.get('target', '')).strip()
+    if op == 'list':
+        with LOCK: online = {c.name.casefold() for c in clients.values()}
+        bu = {r[0] for r in qa("SELECT v FROM bans WHERE kind='user'")}; bi = {r[0] for r in qa("SELECT v FROM bans WHERE kind='ip'")}
+        ips = {}
+        for u_, ip_ in qa('SELECT u,ip FROM sessions'): ips.setdefault(u_, set()).add(ip_)
+        rows = []
+        for u_, cr, ll, lip in qa('SELECT u,created,last_login,last_ip FROM accounts ORDER BY last_login DESC'):
+            w = wallet(u_); p = qa('SELECT kills,deaths,playtime FROM players WHERE tok=?', (u_,)); k, de, pt = p[0] if p else (0, 0, 0)
+            al = sorted(ips.get(u_, set()) | ({lip} if lip else set()))
+            rows.append({'u': u_, 'created': cr, 'last': ll, 'ip': lip, 'ips': al, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(k, pt),
+                         'kills': k, 'deaths': de, 'min': (pt or 0) // 60, 'online': u_.casefold() in online, 'banned': u_.casefold() in bu, 'ipbanned': any(i in bi for i in al)})
+        return 200, {'players': rows}
+    a = find_acc(tg)
+    if not a: return 404, {'error': 'Аккаунт не найден'}
+    t = a[0]
+    if t.casefold() == me.casefold() and op in ('ban', 'delete', 'reset', 'banip'): return 400, {'error': 'Нельзя применить к себе'}
+    if op == 'ban':
+        q('INSERT OR REPLACE INTO bans VALUES(?,?,?,?)', ('user', t.casefold(), str(d.get('reason', ''))[:80], time.time())); q('DELETE FROM sessions WHERE u=?', (t,)); kick_user(t, 'Вы заблокированы')
+    elif op == 'unban':
+        q("DELETE FROM bans WHERE kind='user' AND v=?", (t.casefold(),))
+        for ip_ in {r[0] for r in qa('SELECT ip FROM sessions WHERE u=?', (t,))} | {a2[3] for a2 in qa('SELECT u,salt,h,last_ip FROM accounts WHERE u=?', (t,))}: q("DELETE FROM bans WHERE kind='ip' AND v=?", (ip_,))
+    elif op == 'banip':
+        ips_ = {r[0] for r in qa('SELECT ip FROM sessions WHERE u=?', (t,))} | {r[0] for r in qa('SELECT last_ip FROM accounts WHERE u=?', (t,))}
+        for ip_ in ips_:
+            if ip_: q('INSERT OR REPLACE INTO bans VALUES(?,?,?,?)', ('ip', ip_, 'admin', time.time()))
+        kick_user(t, 'Ваш IP заблокирован')
+    elif op == 'kick': kick_user(t, 'Вас выгнал администратор')
+    elif op == 'delete':
+        kick_user(t, 'Аккаунт удалён')
+        for t_, k_ in (('accounts', 'u'), ('sessions', 'u'), ('players', 'tok'), ('wallet', 'u')): q(f'DELETE FROM {t_} WHERE {k_}=?', (t,))
+    elif op == 'reset':   # обнуление прогресса: инвентарь, позиция, статистика, монеты
+        kick_user(t, 'Ваш прогресс обнулён'); q('DELETE FROM players WHERE tok=?', (t,)); q("UPDATE wallet SET coins=0, promos='' WHERE u=?", (t,))
+    elif op == 'setcoins': q('INSERT OR IGNORE INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?)', (t, '')); q('UPDATE wallet SET coins=? WHERE u=?', (max(0, min(10**9, int(d.get('v', 0)))), t))
+    else: return 400, {'error': 'Неизвестная команда'}
+    print(f'* админ {me}: {op} {t}'); return 200, {'ok': True}
+
 LOCK = threading.Lock(); clients = {}; _id = [1]
 world = {'dead': [r[0] for r in qa('SELECT i FROM dead')], 'hp': {str(i): h for i, h in qa('SELECT i,h FROM res_hp')},
          'builds': [json.loads(r[0]) for r in qa('SELECT j FROM builds ORDER BY id')]}
@@ -808,11 +874,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(204); self.send_header('Access-Control-Allow-Headers', 'Content-Type'); self.send_header('Access-Control-Allow-Methods', 'GET, POST'); self.end_headers()
     def do_POST(self):
         p = self.path.split('?')[0]
-        try: n = int(self.headers.get('Content-Length', 0)); d = json.loads(self.rfile.read(n).decode()) if 0 < n <= 2048 else None
+        try: n = int(self.headers.get('Content-Length', 0)); d = json.loads(self.rfile.read(n).decode()) if 0 < n <= 4096 else None
         except (ValueError, OSError): d = None
         if not isinstance(d, dict): return self.reply(400, {'error': 'Некорректный запрос'})
         if p in ('/api/register', '/api/login'):
             code, obj = api_auth(p[5:], d, self.cip()); return self.reply(code, obj)
+        if p in ('/api/promo', '/api/me', '/api/admin'):
+            try:
+                if p == '/api/promo': code, obj = api_promo(d)
+                elif p == '/api/admin': code, obj = api_admin(d)
+                else:
+                    u = session_user(d.get('token')); code, obj = (200, me_info(u)) if u else (401, {'error': 'auth'})
+            except Exception as e: code, obj = 500, {'error': 'Ошибка сервера: ' + str(e)[:80]}
+            return self.reply(code, obj)
         self.send_error(404)
     def do_GET(self):
         p = self.path.split('?')[0]
