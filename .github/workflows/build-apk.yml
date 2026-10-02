@@ -1,6 +1,7 @@
 name: Build APK
-# Адрес сервера по умолчанию зашит ниже; можно переопределить переменной SERVER_URL (Settings → Variables)
-# Для подписи release: секреты KEYSTORE_BASE64 и KEYSTORE_PASSWORD (алиас ключа: anode). Без них соберётся debug-APK.
+# Отдельный APK на движке Firefox (GeckoView) вместо Android WebView: игра лежит внутри (зашифрованный a.dat + обфусцированный b.js),
+# мультиплеер идёт на сервер из SERVER_URL. Весь Android-проект генерируется прямо в этом workflow — другие файлы менять не нужно.
+# Для постоянной подписи: секреты KEYSTORE_BASE64 и KEYSTORE_PASSWORD (алиас ключа: anode). Без них — временный ключ.
 on:
   workflow_dispatch:
   push:
@@ -14,10 +15,22 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.11.1 }
       - name: Сборка веб-части (обфускация, шифрование ресурсов и кода)
         env:
           SERVER_URL: ${{ vars.SERVER_URL || 'https://js-anode-survival-server-multi.onrender.com' }}
         run: |
+          python3 - <<'PATCH_END'
+          p='tools/loader.tpl.js'
+          s=open(p,encoding='utf-8').read()
+          old="hook(CSSStyleDeclaration.prototype,n,fix));"
+          new="{ hook(CSSStyleDeclaration.prototype,n,fix); if(window.CSS2Properties) hook(CSS2Properties.prototype,n,fix); });"
+          if old in s and 'CSS2Properties' not in s:
+              s=s.replace(old,new,1)
+              open(p,'w',encoding='utf-8').write(s)
+          print('loader patched' if 'CSS2Properties' in s else 'loader pattern not found')
+          PATCH_END
           npm i --no-save three@0.128.0 javascript-obfuscator@4
           mkdir -p ws/js && cp -r index.html css assets 1 ws/ && cp js/*.js ws/js/ && cp node_modules/three/build/three.min.js ws/
           for f in ws/js/*.js; do
@@ -27,41 +40,282 @@ jobs:
           node tools/pack.js ws www
           npx javascript-obfuscator www/b.js --output www/b.js --compact true --control-flow-flattening true --control-flow-flattening-threshold 0.6 --dead-code-injection true --dead-code-injection-threshold 0.3 --string-array true --string-array-encoding rc4 --string-array-threshold 1 --identifier-names-generator hexadecimal --split-strings true --split-strings-chunk-length 5
           ls -la www
-      - name: Capacitor + Android
+      - name: Генерация Android-проекта (GeckoView)
         run: |
-          npm i --no-save @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "ANODE SURVIVAL" com.anode.survival --web-dir www
-          npx cap add android
-          npx cap sync android
-          M=android/app/src/main/AndroidManifest.xml
-          # allowBackup уже есть в шаблоне манифеста — заменяем значение, а не добавляем дубль атрибута
-          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' $M
-          grep -q 'android:screenOrientation' $M || sed -i '0,/<activity/s//<activity android:screenOrientation="sensorLandscape"/' $M
-          cat $M
-          # конфликт kotlin-stdlib (1.8.22 vs jdk7/jdk8 1.6.21) — приводим всё к одной версии
-          cat >> android/app/build.gradle <<'EOF2'
-          
-          configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+          set -e
+          rm -rf gecko && mkdir -p gecko/app/src/main/java/com/anode/survival gecko/app/src/main/res/values gecko/app/src/main/res/mipmap-xxxhdpi gecko/app/src/main/assets/www
+          cat > gecko/settings.gradle <<'GEN_END_0'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://maven.mozilla.org/maven2/' }
               }
           }
-          EOF2
+          rootProject.name = 'anode-gecko'
+          include ':app'
+          GEN_END_0
+          cat > gecko/build.gradle <<'GEN_END_1'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          GEN_END_1
+          cat > gecko/gradle.properties <<'GEN_END_2'
+          org.gradle.jvmargs=-Xmx3g
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          GEN_END_2
+          cat > gecko/app/build.gradle <<'GEN_END_3'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.anode.survival'
+              compileSdk 35
+              defaultConfig {
+                  applicationId 'com.anode.survival'
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+                  ndk { abiFilters 'arm64-v8a' }   // современные телефоны; без фильтра APK получается огромным
+              }
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv('KS_FILE') ?: '../release.jks')
+                      storePassword System.getenv('KS_PASS') ?: 'anode123'
+                      keyAlias 'anode'
+                      keyPassword System.getenv('KS_PASS') ?: 'anode123'
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                  }
+              }
+              packaging {
+                  jniLibs { useLegacyPackaging = true }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+
+          dependencies {
+              implementation 'org.mozilla.geckoview:geckoview:150.0.20260511200624'
+          }
+          GEN_END_3
+          cat > gecko/app/src/main/AndroidManifest.xml <<'GEN_END_4'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <application
+                  android:allowBackup="false"
+                  android:hardwareAccelerated="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:largeHeap="true"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="sensorLandscape"
+                      android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density"
+                      android:launchMode="singleTask">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          GEN_END_4
+          cat > gecko/app/src/main/res/values/strings.xml <<'GEN_END_5'
+          <resources>
+              <string name="app_name">ANODE SURVIVAL</string>
+          </resources>
+          GEN_END_5
+          cat > gecko/app/src/main/res/values/styles.xml <<'GEN_END_6'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+                  <item name="android:windowBackground">@android:color/black</item>
+              </style>
+          </resources>
+          GEN_END_6
+          cat > gecko/app/src/main/java/com/anode/survival/AssetServer.java <<'GEN_END_7'
+          package com.anode.survival;
+
+          import android.content.res.AssetManager;
+
+          import java.io.BufferedInputStream;
+          import java.io.ByteArrayOutputStream;
+          import java.io.IOException;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.net.InetAddress;
+          import java.net.ServerSocket;
+          import java.net.Socket;
+
+          /** Крошечный HTTP-сервер на 127.0.0.1: отдаёт файлы из assets/www. Игра открывается как обычный http-сайт (localStorage, fetch, blob работают). */
+          public class AssetServer {
+              private static final int PORT = 38417;   // фиксированный порт => постоянный origin => localStorage переживает перезапуски
+              private final AssetManager assets;
+              private ServerSocket server;
+              public int port;
+
+              public AssetServer(AssetManager assets) { this.assets = assets; }
+
+              public void start() throws IOException {
+                  InetAddress lo = InetAddress.getByName("127.0.0.1");
+                  try { server = new ServerSocket(PORT, 50, lo); }
+                  catch (IOException e) { server = new ServerSocket(0, 50, lo); }
+                  port = server.getLocalPort();
+                  Thread t = new Thread(() -> {
+                      while (!server.isClosed()) {
+                          try {
+                              final Socket s = server.accept();
+                              new Thread(() -> handle(s)).start();
+                          } catch (IOException e) { break; }
+                      }
+                  }, "asset-server");
+                  t.setDaemon(true);
+                  t.start();
+              }
+
+              public void stop() { try { if (server != null) server.close(); } catch (IOException ignored) {} }
+
+              private static String mime(String p) {
+                  if (p.endsWith(".html")) return "text/html; charset=utf-8";
+                  if (p.endsWith(".js")) return "text/javascript; charset=utf-8";
+                  if (p.endsWith(".css")) return "text/css; charset=utf-8";
+                  if (p.endsWith(".json")) return "application/json";
+                  return "application/octet-stream";
+              }
+
+              private void handle(Socket s) {
+                  try (Socket sock = s) {
+                      InputStream in = new BufferedInputStream(sock.getInputStream());
+                      ByteArrayOutputStream head = new ByteArrayOutputStream();
+                      int b, state = 0;
+                      while (head.size() < 16384 && (b = in.read()) != -1) {
+                          head.write(b);
+                          state = (b == '\r' || b == '\n') ? state + 1 : 0;
+                          if (state == 4 || (b == '\n' && head.size() >= 2 && head.toByteArray()[head.size() - 2] == '\n')) break;
+                      }
+                      String req = head.toString("UTF-8");
+                      String line = req.split("\r?\n", 2)[0];
+                      String[] parts = line.split(" ");
+                      OutputStream out = sock.getOutputStream();
+                      if (parts.length < 2 || !parts[0].equals("GET")) {
+                          out.write("HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".getBytes("UTF-8"));
+                          out.flush();
+                          return;
+                      }
+                      String path = parts[1];
+                      int q = path.indexOf('?'); if (q >= 0) path = path.substring(0, q);
+                      int h = path.indexOf('#'); if (h >= 0) path = path.substring(0, h);
+                      if (path.equals("/") || path.isEmpty()) path = "/index.html";
+                      if (path.contains("..")) path = "/index.html";
+                      try (InputStream f = assets.open("www" + path)) {
+                          out.write(("HTTP/1.1 200 OK\r\nContent-Type: " + mime(path) + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+                          byte[] buf = new byte[65536];
+                          int n;
+                          while ((n = f.read(buf)) > 0) out.write(buf, 0, n);
+                      } catch (IOException nf) {
+                          out.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n".getBytes("UTF-8"));
+                      }
+                      out.flush();
+                  } catch (IOException ignored) {}
+              }
+          }
+          GEN_END_7
+          cat > gecko/app/src/main/java/com/anode/survival/MainActivity.java <<'GEN_END_8'
+          package com.anode.survival;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.WindowManager;
+
+          import org.mozilla.geckoview.GeckoRuntime;
+          import org.mozilla.geckoview.GeckoSession;
+          import org.mozilla.geckoview.GeckoView;
+
+          public class MainActivity extends Activity {
+              private static GeckoRuntime sRuntime;
+              private GeckoSession session;
+              private AssetServer server;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  immersive();
+
+                  server = new AssetServer(getAssets());
+                  try { server.start(); } catch (Exception e) { throw new RuntimeException(e); }
+
+                  GeckoView view = new GeckoView(this);
+                  setContentView(view);
+
+                  if (sRuntime == null) sRuntime = GeckoRuntime.create(getApplicationContext());
+                  session = new GeckoSession();
+                  session.setContentDelegate(new GeckoSession.ContentDelegate() {
+                      @Override
+                      public void onFullScreen(GeckoSession s, boolean fullScreen) { immersive(); }
+                  });
+                  session.open(sRuntime);
+                  view.setSession(session);
+                  session.loadUri("http://127.0.0.1:" + server.port + "/index.html");
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) immersive();
+              }
+
+              @SuppressWarnings("deprecation")
+              private void immersive() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (session != null) session.close();
+                  if (server != null) server.stop();
+                  super.onDestroy();
+              }
+          }
+          GEN_END_8
+          cp assets/icons/icon-192.png gecko/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp www/a.dat www/b.js www/index.html gecko/app/src/main/assets/www/
       - name: Сборка APK
+        working-directory: gecko
         env:
           KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
-          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          cd android
           if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > app/release.jks
-            ./gradlew assembleRelease -Pandroid.injected.signing.store.file=$PWD/app/release.jks -Pandroid.injected.signing.store.password=$KS_PASS -Pandroid.injected.signing.key.alias=anode -Pandroid.injected.signing.key.password=$KS_PASS
+            echo "$KS_B64" | base64 -d > release.jks
+            export KS_PASS="$KS_PASSWORD"
           else
-            ./gradlew assembleDebug
+            export KS_PASS=anode123
+            keytool -genkeypair -keystore release.jks -storetype PKCS12 -alias anode -storepass $KS_PASS -keypass $KS_PASS -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ANODE"
           fi
+          export KS_FILE="$PWD/release.jks"
+          gradle assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: anode-apk
-          path: android/app/build/outputs/apk/**/*.apk
+          path: gecko/app/build/outputs/apk/release/*.apk
