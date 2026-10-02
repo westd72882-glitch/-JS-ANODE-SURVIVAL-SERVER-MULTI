@@ -53,15 +53,26 @@ elif os.path.exists(DBF):
     except OSError: pass
 
 # ---------------- PostgreSQL (если задан DATABASE_URL) или SQLite ----------------
-DATABASE_URL = os.environ.get('DATABASE_URL') or str(CFG.get('database_url') or '')
+DATABASE_URL = os.environ.get('DATABASE_URL') or str(CFG.get('database_url') or '').strip().strip('"\'')
+if DATABASE_URL and 'sslmode' not in DATABASE_URL and '.render.com' in DATABASE_URL: DATABASE_URL += ('&' if '?' in DATABASE_URL else '?') + 'sslmode=require'   # External URL требует SSL
 PG = bool(DATABASE_URL) and '--sqlite' not in argv
+if os.environ.get('RENDER') and not PG and not os.path.ismount(DATA) and '--fresh' not in argv:
+    sys.exit('!!! На Render нет DATABASE_URL и нет постоянного диска: аккаунты и мир пропадут при каждом перезапуске.\n'
+             'Добавь в Environment сервиса переменную DATABASE_URL (Internal Database URL из Render → PostgreSQL → Connect) и сделай Manual Deploy.')
 if PG:
     try: import psycopg2
     except ImportError:
         print('* ставлю psycopg2-binary…')
         try:
-            import subprocess; subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '--user', '--break-system-packages', 'psycopg2-binary'])
-            import site, importlib; importlib.invalidate_caches(); sys.path.append(site.getusersitepackages()); import psycopg2
+            import subprocess, site, importlib
+            _in_venv = sys.prefix != getattr(sys, 'base_prefix', sys.prefix)
+            for _extra in ([[]] if _in_venv else [['--user', '--break-system-packages'], ['--break-system-packages'], []]):   # в venv (Render) --user запрещён
+                try: subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q'] + _extra + ['psycopg2-binary>=2.9.11']); break
+                except Exception: continue
+            importlib.invalidate_caches()
+            try: sys.path.append(site.getusersitepackages())
+            except Exception: pass
+            import psycopg2
         except Exception as e:
             sys.exit('!!! DATABASE_URL задан, но psycopg2 не установился (%s). Добавь в Build Command: pip install -r requirements.txt' % e)
 PG_COLS = {'dead': ('i', 't'), 'res_hp': ('i', 'h'), 'bhp': ('id', 'h'), 'locks': ('k', 'c'), 'storage': ('id', 'j'), 'bans': ('kind', 'v', 'reason', 't'), 'meta': ('k', 'v')}
@@ -118,10 +129,11 @@ if PG:
         _t = PGDB(DATABASE_URL)
         for t_ in ('dead', 'res_hp', 'builds', 'players', 'accounts', 'sessions', 'bans', 'chatlog', 'meta', 'bags', 'bhp', 'locks', 'dauth', 'storage'): _t.execute(f'DROP TABLE IF EXISTS {t_}')
         _t.close()
-    try: DB = PGDB(DATABASE_URL); print('База: PostgreSQL')
+    try: DB = PGDB(DATABASE_URL); print('База: PostgreSQL ->', re.sub(r'//[^@]*@', '//***@', DATABASE_URL).split('?')[0])
     except Exception as e: sys.exit('!!! Не удалось подключиться к PostgreSQL: %s\nПроверь DATABASE_URL (Internal Database URL из Render).' % e)
 else:
     DB = sqlite3.connect(DBF, check_same_thread=False)
+    print('База: SQLite ->', DBF)
 DB.executescript('''PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
 CREATE TABLE IF NOT EXISTS dead(i INTEGER PRIMARY KEY, t REAL);
 CREATE TABLE IF NOT EXISTS res_hp(i INTEGER PRIMARY KEY, h REAL);
