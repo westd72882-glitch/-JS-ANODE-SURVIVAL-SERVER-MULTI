@@ -1,5 +1,5 @@
 {
-  "name": "ANODE server",
+  "name": "server anode 1",
   "port": 8000,
   "max": 16,
   "motd": "",

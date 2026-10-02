@@ -34,6 +34,7 @@
       <div class="m-tab active" data-tab="home"><i class="ic-home"></i><b>Главная</b></div>
       <div class="m-tab" data-tab="servers"><i class="ic-play"></i><b>Играть</b><span id="m-tabSubServ">2 сервер(ов), 0 игрок(ов)</span></div>
       <div class="m-tab" data-tab="top"><i class="ic-top"></i><b>Топ</b></div>
+      <div class="m-tab" data-tab="donate"><i class="ic-gift"></i><b>Донат</b></div>
       <div class="m-tab" data-tab="promo"><i class="ic-gift"></i><b>Промокод</b></div>
     </nav>
     <div class="m-tools">
@@ -76,6 +77,7 @@
 
     <section id="m-paneTop" class="hidden"><div id="m-topList"></div></section>
 
+    <section id="m-paneDonate" class="hidden"><div class="m-promo" id="m-donate"></div></section>
     <section id="m-panePromo" class="hidden">
       <div class="m-promo">
         <div class="m-qhead">ПРОМОКОД</div>
@@ -259,7 +261,7 @@
 /* главная вкладка меню: быстрое подключение, переключение панелей */
 (function(){
   const $=id=>document.getElementById(id), tabs=[...document.querySelectorAll('.m-tab')];
-  const panes={home:$('m-paneHome'),servers:$('m-paneServers'),top:$('m-paneTop'),promo:$('m-panePromo')};
+  const panes={home:$('m-paneHome'),servers:$('m-paneServers'),top:$('m-paneTop'),promo:$('m-panePromo'),donate:$('m-paneDonate')};
   function show(w){ for(const k in panes) panes[k].classList.toggle('hidden',k!==w); tabs.forEach(t=>t.classList.toggle('active',t.dataset.tab===w)); }
   tabs.forEach(t=>t.addEventListener('click',()=>show(t.dataset.tab)));
   $('m-goServers').addEventListener('click',()=>{ show('servers'); tabs.find(t=>t.dataset.tab==='servers').click(); });

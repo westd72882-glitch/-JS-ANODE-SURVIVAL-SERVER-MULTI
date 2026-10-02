@@ -220,14 +220,24 @@ def api_auth(kind, d, ip):
 
 # ---------------- кошелёк, промокоды, админ-панель (всё в БД) ----------------
 DB.executescript('''CREATE TABLE IF NOT EXISTS wallet(u TEXT PRIMARY KEY, coins INTEGER DEFAULT 0, admin INTEGER DEFAULT 0, promos TEXT DEFAULT '');''')
+DB.executescript('''CREATE TABLE IF NOT EXISTS donations(u TEXT, item TEXT, PRIMARY KEY(u,item));
+CREATE TABLE IF NOT EXISTS xp(u TEXT PRIMARY KEY, v INTEGER);
+CREATE TABLE IF NOT EXISTS promocodes(code TEXT PRIMARY KEY, coins INTEGER, item TEXT, uses INTEGER, used INTEGER);''')
+SHOP = {'copter': 420, 'quarry': 1200}; SHOPL = threading.Lock()
+def owned(u): return sorted(SHOP) if wallet(u)['admin'] else [r[0] for r in qa('SELECT item FROM donations WHERE u=?', (u,))]
+def owns(u, item): return item in owned(u)
+def add_xp(u, n):
+    if u and n: q('INSERT INTO xp(u,v) VALUES(?,?) ON CONFLICT(u) DO UPDATE SET v=xp.v+excluded.v', (u, int(n)))
+def get_xp(u):
+    r = qa('SELECT v FROM xp WHERE u=?', (u,)); return r[0][0] if r else 0
 PROMOS = {'OSIL2026': 100, 'RUSTLIKE': 50, 'TESTER': 25}; ADMIN_CODE, ADMIN_COINS = 'ADMIN6737', 1000
 def wallet(u):
     q('INSERT INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?) ON CONFLICT(u) DO NOTHING', (u, ''))
     r = qa('SELECT coins,admin,promos FROM wallet WHERE u=?', (u,))[0]; return {'coins': r[0] or 0, 'admin': bool(r[1]), 'promos': [x for x in (r[2] or '').split(',') if x]}
-def level_of(kills, playtime): return 1 + int(math.sqrt(max(0, (playtime or 0) / 60.0 * 2 + (kills or 0) * 10)))
+def level_of(xp): return 1 + int(math.sqrt(max(0, xp or 0) / 25.0))   # ур.2=25, ур.5=400, ур.10=2025 опыта
 def me_info(u):
-    w = wallet(u); p = qa('SELECT kills,playtime FROM players WHERE tok=?', (u,)); k, pt = (p[0] if p else (0, 0))
-    return {'u': u, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(k, pt)}
+    w = wallet(u); x = get_xp(u); L = level_of(x)
+    return {'u': u, 'coins': w['coins'], 'admin': w['admin'], 'level': L, 'xp': x, 'xpmin': (L - 1) ** 2 * 25, 'xpmax': L ** 2 * 25, 'items': owned(u), 'shop': SHOP}
 def api_promo(d):
     u = session_user(d.get('token'))
     if not u: return 401, {'error': 'Войдите в аккаунт на сервере'}
@@ -238,8 +248,25 @@ def api_promo(d):
         else: q('UPDATE wallet SET admin=1 WHERE u=?', (u,))
         print(f'* {u} активировал админ-код'); return 200, {'msg': msg, **me_info(u)}
     if code in w['promos']: return 200, {'error': 'Код уже использован'}
+    cp = qa('SELECT coins,item,uses,used FROM promocodes WHERE code=?', (code,))
+    if cp:
+        c_, it_, us_, ud_ = cp[0]
+        if us_ and ud_ >= us_: return 200, {'error': 'Лимит активаций кода исчерпан'}
+        q('UPDATE promocodes SET used=used+1 WHERE code=?', (code,)); q('UPDATE wallet SET coins=coins+?, promos=? WHERE u=?', (c_ or 0, ','.join(w['promos'] + [code]), u))
+        if it_ in SHOP: q('INSERT INTO donations VALUES(?,?) ON CONFLICT DO NOTHING', (u, it_))
+        return 200, {'msg': f'Код принят: +{c_ or 0} монет' + (f', {it_}' if it_ in SHOP else ''), **me_info(u)}
     if code not in PROMOS: return 200, {'error': 'Неверный код'}
     q('UPDATE wallet SET coins=coins+?, promos=? WHERE u=?', (PROMOS[code], ','.join(w['promos'] + [code]), u)); return 200, {'msg': f'+{PROMOS[code]} монет!', **me_info(u)}
+def api_shop(d):
+    u = session_user(d.get('token'))
+    if not u: return 401, {'error': 'Войдите в аккаунт на сервере'}
+    it = str(d.get('item', ''))
+    if it not in SHOP: return 400, {'error': 'Нет такого предложения'}
+    with SHOPL:
+        if owns(u, it): return 200, {'error': 'Уже куплено'}
+        if wallet(u)['coins'] < SHOP[it]: return 200, {'error': f'Нужно {SHOP[it]} монет'}
+        q('UPDATE wallet SET coins=coins-? WHERE u=?', (SHOP[it], u)); q('INSERT INTO donations VALUES(?,?) ON CONFLICT DO NOTHING', (u, it))
+    print(f'* {u} купил {it}'); return 200, {'msg': 'Куплено! Теперь можно крафтить и ставить', **me_info(u)}
 def kick_user(u, msg):
     c = find_client(u)
     if c: c.send({'t': 'kick', 'm': msg}); c.tok = ''; c.kick()
@@ -247,6 +274,14 @@ def api_admin(d):
     me = session_user(d.get('token'))
     if not me or not wallet(me)['admin']: return 403, {'error': 'Нет доступа'}
     op, tg = str(d.get('op', 'list')), str(d.get('target', '')).strip()
+    if op == 'promo_list': return 200, {'promos': [{'code': r[0], 'coins': r[1], 'item': r[2], 'uses': r[3], 'used': r[4]} for r in qa('SELECT code,coins,item,uses,used FROM promocodes ORDER BY code')]}
+    if op == 'promo_add':
+        c_ = re.sub(r'[^A-Z0-9_А-Я-]', '', str(d.get('code', '')).upper())[:24]
+        if len(c_) < 3: return 400, {'error': 'Код: 3–24 символа'}
+        it_ = str(d.get('item', '')) if str(d.get('item', '')) in SHOP else ''
+        q('DELETE FROM promocodes WHERE code=?', (c_,)); q('INSERT INTO promocodes VALUES(?,?,?,?,0)', (c_, max(0, min(10**7, int(d.get('coins', 0) or 0))), it_, max(0, int(d.get('uses', 0) or 0))))
+        return 200, {'ok': True}
+    if op == 'promo_del': q('DELETE FROM promocodes WHERE code=?', (str(d.get('code', '')).upper(),)); return 200, {'ok': True}
     if op == 'list':
         with LOCK: online = {c.name.casefold() for c in clients.values()}
         bu = {r[0] for r in qa("SELECT v FROM bans WHERE kind='user'")}; bi = {r[0] for r in qa("SELECT v FROM bans WHERE kind='ip'")}
@@ -254,9 +289,9 @@ def api_admin(d):
         for u_, ip_ in qa('SELECT u,ip FROM sessions'): ips.setdefault(u_, set()).add(ip_)
         rows = []
         for u_, cr, ll, lip in qa('SELECT u,created,last_login,last_ip FROM accounts ORDER BY last_login DESC'):
-            w = wallet(u_); p = qa('SELECT kills,deaths,playtime FROM players WHERE tok=?', (u_,)); k, de, pt = p[0] if p else (0, 0, 0)
+            w = wallet(u_); p = qa('SELECT kills,deaths,playtime FROM players WHERE tok=?', (u_,)); k, de, pt = p[0] if p else (0, 0, 0); xp_ = get_xp(u_)
             al = sorted(ips.get(u_, set()) | ({lip} if lip else set()))
-            rows.append({'u': u_, 'created': cr, 'last': ll, 'ip': lip, 'ips': al, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(k, pt),
+            rows.append({'u': u_, 'created': cr, 'last': ll, 'ip': lip, 'ips': al, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(xp_), 'xp': xp_, 'items': owned(u_),
                          'kills': k, 'deaths': de, 'min': (pt or 0) // 60, 'online': u_.casefold() in online, 'banned': u_.casefold() in bu, 'ipbanned': any(i in bi for i in al)})
         return 200, {'players': rows}
     a = find_acc(tg)
@@ -276,9 +311,15 @@ def api_admin(d):
     elif op == 'kick': kick_user(t, 'Вас выгнал администратор')
     elif op == 'delete':
         kick_user(t, 'Аккаунт удалён')
-        for t_, k_ in (('accounts', 'u'), ('sessions', 'u'), ('players', 'tok'), ('wallet', 'u')): q(f'DELETE FROM {t_} WHERE {k_}=?', (t,))
+        for t_, k_ in (('accounts', 'u'), ('sessions', 'u'), ('players', 'tok'), ('wallet', 'u'), ('donations', 'u'), ('xp', 'u')): q(f'DELETE FROM {t_} WHERE {k_}=?', (t,))
     elif op == 'reset':   # обнуление прогресса: инвентарь, позиция, статистика, монеты
-        kick_user(t, 'Ваш прогресс обнулён'); q('DELETE FROM players WHERE tok=?', (t,)); q("UPDATE wallet SET coins=0, promos='' WHERE u=?", (t,))
+        kick_user(t, 'Ваш прогресс обнулён'); q('DELETE FROM players WHERE tok=?', (t,)); q("UPDATE wallet SET coins=0, promos='' WHERE u=?", (t,)); q('DELETE FROM donations WHERE u=?', (t,)); q('DELETE FROM xp WHERE u=?', (t,))
+    elif op in ('giveitem', 'takeitem'):
+        it_ = str(d.get('item', ''))
+        if it_ not in SHOP: return 400, {'error': 'Предмет: ' + ', '.join(SHOP)}
+        if op == 'giveitem': q('INSERT INTO donations VALUES(?,?) ON CONFLICT DO NOTHING', (t, it_))
+        else: q('DELETE FROM donations WHERE u=? AND item=?', (t, it_))
+    elif op == 'setxp': q('DELETE FROM xp WHERE u=?', (t,)); add_xp(t, max(0, min(10**8, int(d.get('v', 0)))))
     elif op == 'setcoins': q('INSERT INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?) ON CONFLICT(u) DO NOTHING', (t, '')); q('UPDATE wallet SET coins=? WHERE u=?', (max(0, min(10**9, int(d.get('v', 0)))), t))
     else: return 400, {'error': 'Неизвестная команда'}
     print(f'* админ {me}: {op} {t}'); return 200, {'ok': True}
@@ -578,7 +619,7 @@ def handle_msg(cl, m):
     elif t == 'hr':                         # добыча ресурса: урон по узлу, количество и лут считает сервер
         i, ty, tool = m.get('i'), m.get('ty'), m.get('k'); now = time.time()
         if not (isinstance(i, int) and 0 <= i < 200000 and ty in NODES) or now - getattr(cl, 'last_hr', 0) < 0.3: return
-        cl.last_hr = now
+        cl.last_hr = now; add_xp(cl.tok, 3 if ty in ('metal', 'sulfur', 'ore') else 2)
         with LOCK:
             if i in world['dead']: return
             ty = node_types.setdefault(i, ty)
@@ -651,7 +692,8 @@ def handle_msg(cl, m):
         try: b = {'t': 'bd', 'k': m['k'], 'x': float(m['x']), 'y': float(m['y']), 'z': float(m['z']), 'r': float(m.get('r') or 0), 'l': int(m['l']), 'b': float(m.get('b') or 0), 'tm': int(time.time() * 1000)}
         except (KeyError, TypeError, ValueError): return
         if b['k'] not in PMAX or not all(math.isfinite(b[k]) for k in ('x', 'y', 'z', 'r', 'b')): return
-        pid = part_id(b)
+        if b['k'] in SHOP and not owns(cl.tok, b['k']): cl.send({'t': 'c', 'n': '', 'm': '[Сервер] Карьер — донат-предмет. Купите его во вкладке «Донат»'}); return
+        pid = part_id(b); add_xp(cl.tok, 1)
         if pid in parts: return
         with LOCK: parts[pid] = b; world['builds'].append(b)
         with DBL: cur = DB.execute('INSERT INTO builds(j) VALUES(?)', (json.dumps(b, separators=(',', ':')),)); DB.commit(); prow[pid] = cur.lastrowid
@@ -812,7 +854,7 @@ def handle_msg(cl, m):
     elif t == 'die':
         with LOCK: k = clients.get(m.get('by'))
         q('UPDATE players SET deaths=deaths+1 WHERE tok=?', (cl.tok,))
-        if k and k is not cl: q('UPDATE players SET kills=kills+1 WHERE tok=?', (k.tok,))
+        if k and k is not cl: q('UPDATE players SET kills=kills+1 WHERE tok=?', (k.tok,)); add_xp(k.tok, 50)
         say((k.name + ' убил ' + cl.name) if k else (cl.name + ' погиб'))
     elif t == 'c':
         txt = str(m.get('m', ''))[:120].strip()
@@ -879,10 +921,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not isinstance(d, dict): return self.reply(400, {'error': 'Некорректный запрос'})
         if p in ('/api/register', '/api/login'):
             code, obj = api_auth(p[5:], d, self.cip()); return self.reply(code, obj)
-        if p in ('/api/promo', '/api/me', '/api/admin'):
+        if p in ('/api/promo', '/api/me', '/api/admin', '/api/shop'):
             try:
                 if p == '/api/promo': code, obj = api_promo(d)
                 elif p == '/api/admin': code, obj = api_admin(d)
+                elif p == '/api/shop': code, obj = api_shop(d)
                 else:
                     u = session_user(d.get('token')); code, obj = (200, me_info(u)) if u else (401, {'error': 'auth'})
             except Exception as e: code, obj = 500, {'error': 'Ошибка сервера: ' + str(e)[:80]}
