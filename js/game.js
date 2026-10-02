@@ -2,7 +2,7 @@
 "use strict";
 const CFG = OSIL_SETTINGS.all;          // живые настройки (меню → localStorage)
 let CULL_K = 1;                          // множитель дальности видимости объектов
-let layoutEditing = false, FPS_CAP_MS = 0, FPS_UNLIMITED = false;
+let layoutEditing = false, FPS_CAP_MS = 0;
 
 /* ---------------- Texture loader helpers ---------------- */
 const texLoader = new THREE.TextureLoader();
@@ -5599,18 +5599,26 @@ function updateBoars(dt){
 })();
 
 /* ---------------- Main loop ---------------- */
-let lastTime = performance.now();
-let _loopPending = false;
-const _mc = new MessageChannel();
-_mc.port1.onmessage = ()=>{ _loopPending=false; animate(); };
-function scheduleNext(){
-  if(document.hidden || !FPS_UNLIMITED){ requestAnimationFrame(animate); return; }   // 30 FPS и фон: обычный rAF
-  if(_loopPending) return;
-  _loopPending = true;                                  // без привязки к vsync (60/90/без лимита)
-  const rem = FPS_CAP_MS ? FPS_CAP_MS - (performance.now() - lastTime) : 0;
-  if(rem > 3) setTimeout(()=>_mc.port2.postMessage(0), rem - 2);   // спим, чтобы не жечь батарею, последние мс — точный пейсинг
-  else _mc.port2.postMessage(0);
+let lastTime = performance.now();     // «идеальное» время последнего кадра (для лимитера)
+let _lastRenderTs = 0;                // реальное время последнего отрисованного кадра
+let _refreshMs = 1000/60;             // измеренный период обновления экрана
+let _prevRafTs = 0, _rafDeltas = [];
+let _shN = 0;                         // счётчик кадров для равномерного обновления теней
+/* Пейсинг строго по vsync: ВСЕГДА requestAnimationFrame (браузер отдаёт кадр на границе обновления экрана → нет разрывов).
+   Лимит FPS — это пропуск целого числа vsync-тиков (аккумулятор + допуск полтика), а не таймеры setTimeout/MessageChannel,
+   которые сдвигали кадр относительно развёртки и давали разрывы/рывки. */
+function measureRefresh(ts){
+  if(_prevRafTs){
+    const d = ts - _prevRafTs;
+    if(d > 3 && d < 40){
+      _rafDeltas.push(d); if(_rafDeltas.length > 40) _rafDeltas.shift();
+      if(_rafDeltas.length >= 12){ const a = _rafDeltas.slice().sort((x,y)=>x-y); _refreshMs = a[a.length>>1]; }
+    }
+  }
+  _prevRafTs = ts;
 }
+document.addEventListener('visibilitychange', ()=>{ _prevRafTs = 0; _rafDeltas.length = 0; });
+
 /* ================= Дорога, бочки, заправка, Агропром, боты ================= */
 function roadZ(x){ return 0.04*WORLD_SIZE*Math.sin(x/WORLD_SIZE*7.5); }
 const GS = {x:0, z:-15}, AG = {x:78, z:-74};
@@ -6156,12 +6164,19 @@ function updateSeaSound(dt){
   const target=SEA.vol*0.9*(CFG.volMusic/10)*(CFG.volMaster/10), t=SEA.g.context.currentTime; SEA.g.gain.setTargetAtTime(target,t,0.6);
 }
 
-function animate(){
-  scheduleNext();
-  const now = performance.now(), el = now - lastTime;
-  if(FPS_CAP_MS && el < FPS_CAP_MS - (FPS_UNLIMITED ? 0.3 : 2)) return;   // свой лимит (30/60/90); «Без лимита» = частота экрана
-  const dt = Math.min(0.05, el/1000);
-  lastTime = (FPS_CAP_MS && el < FPS_CAP_MS*2) ? lastTime + FPS_CAP_MS : now;   // без дрейфа: ровные кадры, а не 30–40 «через раз»
+function animate(ts){
+  requestAnimationFrame(animate);                       // строго по vsync
+  const now = ts || performance.now();                  // rAF-метка = момент vsync (стабильнее performance.now())
+  measureRefresh(now);
+  const el = now - lastTime;
+  // лимит: рисуем, когда накопился интервал минус пол-тика экрана (допуск на джиттер). 60 на 120 Гц = ровно каждый 2-й vsync
+  if(FPS_CAP_MS && el < FPS_CAP_MS - _refreshMs*0.5) return;
+  lastTime = (FPS_CAP_MS && el < FPS_CAP_MS*2) ? lastTime + FPS_CAP_MS : now;   // без дрейфа
+  // dt = реальное время между показанными кадрами, прилипшее к целому числу vsync (убирает джиттер таймстампов → плавное движение)
+  let rd = _lastRenderTs ? now - _lastRenderTs : _refreshMs; _lastRenderTs = now;
+  const nT = Math.max(1, Math.round(rd/_refreshMs));
+  if(Math.abs(rd - nT*_refreshMs) < _refreshMs*0.3) rd = nT*_refreshMs;
+  const dt = Math.min(0.05, rd/1000);
   updateFPS(now);
 
   if(!document.getElementById('start-screen').classList.contains('hidden')) {
@@ -6192,7 +6207,10 @@ function animate(){
   // сменился набор объектов или раз в 0.3 с (динамические объекты) — а не каждый кадр.
   shadowTimer += dt;
   const _fly=copter.pilot;
-  if((CFG.lighting===1&&!_fly) || ((shadowDirty || shadowTimer > 0.016) && (!_fly || shadowTimer > 0.05))){ renderer.shadowMap.needsUpdate = true; shadowDirty = false; shadowTimer = 0; }
+  _shN++;
+  const _frameMs = (FPS_CAP_MS && FPS_CAP_MS > _refreshMs) ? FPS_CAP_MS : _refreshMs;
+  const _shEvery = Math.max(1, Math.round(33.3/_frameMs));   // ~30 Гц теней, строго через N кадров: ровная нагрузка, без «то 4 мс, то 12 мс»
+  if((CFG.lighting===1&&!_fly) || ((shadowDirty || _shN >= _shEvery) && (!_fly || shadowTimer > 0.05))){ renderer.shadowMap.needsUpdate = true; shadowDirty = false; shadowTimer = 0; _shN = 0; }
 
   renderer.render(scene, camera);
 }
@@ -6380,7 +6398,7 @@ function applySetting(k){
     SHADOW_R2 = (sd*1.2)*(sd*1.2); shadowDirty = true; updateCulling(0,true);
   }
   if(on('shadows') || on('shadowDist')){ SHADOW_TEXEL = (sun.shadow.camera.right*2)/sun.shadow.mapSize.x; }
-  if(on('fpsCap')){ const v=[30,60,90,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v : 0; const u=(v!==30); if(u && !FPS_UNLIMITED){ FPS_UNLIMITED=true; } else if(!u){ FPS_UNLIMITED=false; } }
+  if(on('fpsCap')){ const v=[30,60,90,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v : 0; lastTime = performance.now(); }
   if(on('dist')){
     const far = Math.min(CFG.dist, FOG_MAX);   // туман гарантированно закрывает всё дальше FOG_MAX: ни ряби, ни пустоты под миром
     scene.fog.near = far*0.18; scene.fog.far = far; camera.far = far+10; camera.updateProjectionMatrix();
