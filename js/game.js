@@ -2679,7 +2679,7 @@ function renderCraftUI(){
   // категории
   cats.innerHTML = '';
   CRAFT_CATS.forEach(c=>{
-    const n = CRAFT_RECIPES.filter(r=>c.id==='all'||r.cat===c.id).length;
+    const n = CRAFT_RECIPES.filter(r=>!donLocked(r.give&&(r.give.item||r.give.tool)) && (c.id==='all'||r.cat===c.id)).length;
     const el = document.createElement('div');
     el.className = 'cc-item' + (c.id===craftCat?' active':'');
     el.innerHTML = '<span>'+c.name+'</span><b>'+n+'</b>';
@@ -2688,7 +2688,7 @@ function renderCraftUI(){
   });
   // сетка
   grid.innerHTML = '';
-  const list = CRAFT_RECIPES.filter(r=>craftCat==='all'||r.cat===craftCat);
+  const list = CRAFT_RECIPES.filter(r=>!donLocked(r.give&&(r.give.item||r.give.tool)) && (craftCat==='all'||r.cat===craftCat));
   list.forEach(r=>{
     const el = document.createElement('div');
     el.className = 'cg-slot' + (craftSel===r.id?' sel':'') + (canCraft(r,1)?'':' lack');
@@ -6284,9 +6284,7 @@ document.getElementById('start-btn').addEventListener('click', ()=>{
 });
 
 /* ---------------- Menu: servers / top / promo / settings ---------------- */
-let mServers = [
-  { name:'Одиночная игра', sub:'Survival Island', cur:0, max:1, ping:0, solo:true },
-];
+let mServers = [];
 let mSelServer = 0;
 
 function renderMenuServers(){
@@ -6709,23 +6707,28 @@ window.OSIL_NET = (function(){
       try{ return await r.json(); }catch(e){ return {error: r.status===404 ? 'Сервер не обновлён: загрузите новый server.py и перезапустите' : 'Ошибка ответа сервера ('+r.status+')'}; } },
     async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; } return d; },
     isAdmin(){ return !!(this.me && this.me.admin); },
-    owns(id){ return !!(ADMIN_FREE || (this.me && (this.me.admin || (this.me.items||[]).includes(id)))); }
+    owns(id){ return !!(this.me && (this.me.items||[]).includes(id)); }
   };
   setInterval(()=>{ if(OSIL_ACC.sess()) OSIL_ACC.refresh().then(()=>{ const p=document.getElementById('m-paneDonate'); if(p && !p.classList.contains('hidden')) renderDonate(); }); }, 6000);
   const DON = {copter:{n:'Миникоптер', d:'Личный вертолёт: после покупки можно крафтить и ставить', icon:'1/copter.webp'}, quarry:{n:'Карьер', d:'Сам добывает камень, железо и серу: можно крафтить и ставить', icon:'1/quarry.webp'}};
+  const COIN_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><radialGradient id='g' cx='35%25' cy='30%25' r='80%25'><stop offset='0' stop-color='%23fff3a0'/><stop offset='.55' stop-color='%23f2b705'/><stop offset='1' stop-color='%23b36b00'/></radialGradient></defs><circle cx='32' cy='32' r='30' fill='%238a5200'/><circle cx='32' cy='32' r='27' fill='url(%23g)'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23b8780a' stroke-width='3'/><path d='M32 17v30M25 24h10a5 5 0 0 1 0 10h-8a5 5 0 0 0 0 10h12' fill='none' stroke='%238a5200' stroke-width='4' stroke-linecap='round'/></svg>";
+  document.documentElement.style.setProperty('--coin', 'url("'+COIN_IMG+'")');
   window.renderDonate = function(){
     const el = document.getElementById('m-donate'); if(!el) return; const me = OSIL_ACC.me, ok = !!OSIL_ACC.sess();
-    let h = '<div class="m-qhead">ДОНАТ</div><div style="margin:6px 0;color:#ddd">Монеты: <b style="color:#e8b82a">'+(me?me.coins:mCoins)+'</b>'+(ok?'':' · войдите на сервер, чтобы покупать')+'</div>';
+    let h = '<div class="sh-top"><div class="sh-title">МАГАЗИН ПРЕДМЕТОВ</div><div class="sh-coins"><span>'+(me?me.coins:mCoins)+'</span><img class="coin-i" alt=""></div></div><div class="sh-grid">';
     Object.keys(DON).forEach(k=>{ const price = (me&&me.shop&&me.shop[k]) || (k==='copter'?420:1200), have = OSIL_ACC.owns(k);
-      h += '<div class="dn-card"><img src="'+DON[k].icon+'" alt=""><div class="dn-i"><b>'+DON[k].n+'</b>'+DON[k].d+'</div><button data-k="'+k+'" '+(have?'disabled':'')+'>'+(have?'КУПЛЕНО':price+' мон.')+'</button></div>'; });
-    h += '<button class="m-btn gold" id="dn-get" style="width:100%;margin-top:10px">ПОЛУЧИТЬ ДОНАТ</button><div id="dn-msg" style="margin-top:8px"></div>';
-    el.innerHTML = h;
-    el.querySelectorAll('.dn-card button').forEach(b=>b.addEventListener('click', async()=>{
-      const d = await OSIL_ACC.call('/api/shop', {item:b.dataset.k}), m = document.getElementById('dn-msg');
+      h += '<div class="sh-card'+(have?' own':'')+'" data-k="'+k+'"><div class="sh-price">'+(have?'КУПЛЕНО':price)+(have?'':'<img class="coin-i" alt="">')+'</div><img class="sh-img" src="'+DON[k].icon+'" alt=""><div class="sh-name">'+DON[k].n.toUpperCase()+'</div></div>'; });
+    h += '</div><div id="dn-msg" class="sh-msg">'+(ok?'':'Войдите на сервер, чтобы покупать предметы')+'</div>'+
+      '<div class="sh-bar"><div class="sh-info"><i>i</i>Купленные вещи из меню крафта остаются на бесконечный срок</div><button id="dn-get">ПОЛУЧИТЬ ДОНАТ<br><small>КУПИТЬ МОНЕТЫ</small></button></div>';
+    el.innerHTML = h; el.querySelectorAll('.coin-i').forEach(i=>i.src = COIN_IMG);
+    el.querySelectorAll('.sh-card:not(.own)').forEach(b=>b.addEventListener('click', async()=>{
+      if(!confirm('Купить: '+DON[b.dataset.k].n+'?')) return;
+      const d = await OSIL_ACC.call('/api/shop', {item:b.dataset.k});
       if(d.u){ OSIL_ACC.me = d; mCoins = d.coins; document.getElementById('m-pCoins').textContent = d.coins; }
-      renderDonate(); const m2 = document.getElementById('dn-msg'); m2.textContent = d.error || d.msg; m2.style.color = d.error ? '#d08080' : '#bcd096'; }));
+      renderDonate(); const m2 = document.getElementById('dn-msg'); m2.textContent = d.error || d.msg; m2.style.color = d.error ? '#e08a80' : '#bcd096'; }));
     document.getElementById('dn-get').addEventListener('click', ()=>window.open('https://t.me/AnodeStudioOxide','_blank'));
   };
+
   const lastUser = () => { try{ return localStorage.getItem('anode_lastuser') || ''; }catch(e){ return ''; } };
   const hostPort = s => (s.port==443||s.port==80||!s.port) ? s.host : s.host + ':' + s.port;
   const baseUrl = s => (location.protocol === 'https:' ? 'https://' : 'http://') + hostPort(s);
@@ -6734,16 +6737,18 @@ window.OSIL_NET = (function(){
   function showAuth(s, note, onOk, force){
     const old = document.getElementById('auth-ov'); if(old) old.remove();
     const ov = document.createElement('div'); ov.id = 'auth-ov';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;overflow:auto';
-    const I = 'width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #6b6a5f;background:#1c1b18;color:#fff;font-size:16px;outline:none';
-    const B = 'flex:1;padding:12px 6px;border-radius:8px;border:1px solid #9db07a;background:rgba(88,86,78,.95);color:#fff;font-size:15px;font-weight:bold';
-    ov.innerHTML = '<div style="width:min(88vw,340px);background:#26251f;border:1px solid #6b6a5f;border-radius:14px;padding:18px;color:#eee;font-family:inherit">' +
-      '<div id="au-t" style="font-size:18px;font-weight:bold;margin-bottom:2px"></div><div style="font-size:12px;opacity:.65;margin-bottom:8px">Аккаунт хранится на этом сервере</div>' +
-      '<input id="au-u" style="'+I+'" placeholder="Ник (3–16 символов)" maxlength="16" autocapitalize="off" autocomplete="username">' +
-      '<input id="au-p" type="password" style="'+I+'" placeholder="Пароль (от 6 символов)" maxlength="64" autocomplete="current-password">' +
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:auto;font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;background:linear-gradient(rgba(8,12,20,.72),rgba(8,12,20,.82)),url(1/menu-bg-update.webp) center/cover no-repeat,#10131a';
+    const I = 'width:100%;box-sizing:border-box;padding:12px 14px;margin:5px 0;border:1px solid #3a423d;background:rgba(14,18,16,.92);color:#fff;font-size:16px;letter-spacing:.5px;outline:none;border-radius:0';
+    const B = 'flex:1;padding:14px 6px;border:0;border-radius:0;background:#1b231f;color:#f3ece6;font-size:17px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border-bottom:3px solid #4c6a58';
+    ov.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><img src="1/icon-192.png" style="width:74px;height:74px;box-shadow:0 4px 14px rgba(0,0,0,.6)" alt=""><div style="line-height:.95"><div style="font-size:54px;font-weight:900;color:#f6ece4;letter-spacing:2px">ANODE</div><div style="background:#f6ece4;color:#111;font-weight:900;font-size:17px;letter-spacing:1px;padding:2px 8px;display:inline-block">SURVIVAL ISLAND</div></div></div>' +
+      '<div style="width:min(90vw,360px);background:rgba(20,26,23,.9);padding:14px 16px;color:#eee;box-shadow:0 8px 30px rgba(0,0,0,.6)">' +
+      '<div id="au-t" style="font-size:15px;font-weight:700;letter-spacing:1px;color:#cfe6d6;margin-bottom:6px;text-transform:uppercase"></div>' +
+      '<input id="au-u" style="'+I+'" placeholder="НИК (3–16 символов)" maxlength="16" autocapitalize="off" autocomplete="username">' +
+      '<input id="au-p" type="password" style="'+I+'" placeholder="ПАРОЛЬ (от 6 символов)" maxlength="64" autocomplete="current-password">' +
       '<div id="au-e" style="color:#ff8a80;font-size:13px;min-height:18px;margin:2px 0 8px"></div>' +
       '<div style="display:flex;gap:8px"><button id="au-l" style="'+B+'">Войти</button><button id="au-r" style="'+B+'">Регистрация</button></div>' +
-      '<button id="au-c" style="width:100%;margin-top:8px;padding:10px;background:none;border:none;color:#aaa;font-size:14px;'+(force?'display:none':'')+'">Отмена</button></div>';
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;color:#c9c4bd"><input id="au-ok" type="checkbox" checked style="width:18px;height:18px"><span>Я прочитал и согласился с <span style="color:#4fd1c5">политикой конфиденциальности</span> и <span style="color:#4fd1c5">условиями использования</span></span></label>' +
+      '<button id="au-c" style="width:100%;margin-top:8px;padding:10px;background:none;border:none;color:#9a968f;font-size:14px;'+(force?'display:none':'')+'">Отмена</button></div>';
     document.body.appendChild(ov);
     const $$ = id => ov.querySelector('#' + id), err = $$('au-e');
     $$('au-t').textContent = 'Сервер «' + String(s.name || s.host).replace(/localhost/ig,'server') + '»'; if(note) err.textContent = note;
@@ -6751,6 +6756,7 @@ window.OSIL_NET = (function(){
     const go = async kind => {
       if(busy) return; const u = $$('au-u').value.trim(), p = $$('au-p').value;
       if(!u || !p){ err.textContent = 'Введите ник и пароль'; return; }
+      if(!$$('au-ok').checked){ err.textContent = 'Нужно согласие с условиями'; return; }
       busy = true; err.style.color = '#ccc'; err.textContent = 'Подождите…';
       try{
         const r = await fetch(baseUrl(s) + '/api/' + kind, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({u, p})});
@@ -6758,7 +6764,7 @@ window.OSIL_NET = (function(){
         if(!r.ok || !d.token){ err.style.color = '#ff8a80'; err.textContent = d.error || 'Ошибка'; busy = false; return; }
         authSet(s, {u:d.u, t:d.token}); ov.remove(); setPName(d.u); (onOk || (() => connect(s)))();
       }catch(e){ err.style.color = '#ff8a80'; err.textContent = 'Сервер недоступен (на бесплатном Render он просыпается до минуты) — нажмите ещё раз'; busy = false;
-        if(force){ const c = $$('au-c'); c.style.display = ''; c.textContent = 'Играть без сервера (одиночная)'; } }
+        }
     };
     $$('au-l').onclick = () => go('login'); $$('au-r').onclick = () => go('register'); $$('au-c').onclick = () => ov.remove();
     ov.addEventListener('keydown', e => { if(e.key === 'Enter') go('login'); e.stopPropagation(); }); ov.addEventListener('keyup', e => e.stopPropagation());
@@ -6772,17 +6778,18 @@ window.OSIL_NET = (function(){
   }
   function cleanup(){ clearBags(true); on = false; myId = 0; remotes.forEach(r=>scene.remove(r.root)); remotes.clear(); hud(); }
   function disconnect(){ const w = ws; ws = null; if(w){ w.onclose = null; try{ w.close(); }catch(e){} } cleanup(); }
+  function backToMenu(){ try{ setPause(false); const ss = document.getElementById('start-screen'); ss.classList.remove('hidden'); ss.style.display = ''; if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock(); }catch(e){} }
   function connect(s){
     disconnect(); if(!s || s.solo) return;
     const au = authAll()[authKey(s)]; if(!au){ toast('Сначала войдите в аккаунт'); return; } curSrv = s;
     const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + hostPort(s) + '/ws';
     let w; try{ w = new WebSocket(url); }catch(e){ toast('Неверный адрес сервера'); return; }
     ws = w;
-    const to = setTimeout(()=>{ if(ws === w && !on){ toast('Сервер не отвечает — одиночная игра'); disconnect(); } }, 6000);
+    const to = setTimeout(()=>{ if(ws === w && !on){ toast('Сервер не отвечает'); disconnect(); backToMenu(); } }, 6000);
     w.onopen = () => send({t:'join', k:au.t});
     w.onmessage = e => { try{ onMsg(JSON.parse(e.data)); }catch(err){ console.warn(err); } };
-    w.onerror = () => { if(ws === w && !on){ toast('Не удалось подключиться — одиночная игра'); } };
-    w.onclose = () => { clearTimeout(to); if(ws === w){ if(on) toast('Соединение потеряно'); ws = null; cleanup(); } };
+    w.onerror = () => { if(ws === w && !on){ toast('Не удалось подключиться'); backToMenu(); } };
+    w.onclose = () => { clearTimeout(to); if(ws === w){ if(on){ toast('Соединение потеряно'); backToMenu(); } ws = null; cleanup(); } };
   }
 
   /* ---------------- события игры ---------------- */
@@ -6812,10 +6819,9 @@ window.OSIL_NET = (function(){
     const seen = new Set(), rows = [];
     res.forEach(c => { const key = c.ok ? c.name + '|' + c.port : c.host + ':' + c.port; if(seen.has(key)) return; seen.add(key); rows.push(c); });
     mServers.length = 0;
-    mServers.push({name:'Локальная игра', sub:'Одиночная · без сети', cur:0, max:1, ping:0, solo:true});
     rows.forEach(c => mServers.push({name: c.ok ? (/^(localhost|127\.|192\.168\.|10\.)/.test(c.host) && !c.name ? 'server anode 1' : c.name) : 'server anode 1', sub: c.ok ? 'Онлайн' : 'нет ответа',
       cur: c.ok ? c.cur : 0, max: c.ok ? c.max : 0, ping: c.ok ? c.ping : '—', host: c.host, port: c.port, off: !c.ok}));
-    if(window.__SERVER && !refresh._sel && mServers.length > 1){ mSelServer = 1; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
+    if(window.__SERVER && !refresh._sel && mServers.length > 0){ mSelServer = 0; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
     if(mSelServer >= mServers.length) mSelServer = 0;
     renderMenuServers(); refreshing = false;
   }
@@ -6831,14 +6837,15 @@ window.OSIL_NET = (function(){
     rebind('m-addServ', addServer); rebind('m-refServ', () => { toast('Поиск серверов…'); refresh().then(()=>toast('Список обновлён')); });
     /* вход в аккаунт теперь показывается сразу при открытии меню; при заходе на сервер окно не появляется */
     const sb = $('start-btn');
-    sb.addEventListener('click', () => {
+    sb.addEventListener('click', e => {
       const s = mServers[mSelServer];
-      if(!s || s.solo){ disconnect(); return; }
+      if(!s || s.solo){ e.stopImmediatePropagation(); e.preventDefault(); toast('Выберите сервер'); return; }
+      if(!authAll()[authKey(s)]){ e.stopImmediatePropagation(); e.preventDefault(); showAuth(s, '', () => { connect(s); sb.click(); }, true); return; }
       connect(s);
     }, true);
     $('pm-exit').addEventListener('click', disconnect);
     harvestables.forEach((h,i) => { h.nid = i; });
-    mServers.length = 0; mServers.push({name:'Локальная игра', sub:'Одиночная · без сети', cur:0, max:1, ping:0, solo:true}); mSelServer = 0; renderMenuServers();
+    mServers.length = 0; mSelServer = 0; renderMenuServers();
     {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
       let u0 = null;
       try{ if(window.__SERVER){ const u = new URL(window.__SERVER); u0 = {host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80))}; }
