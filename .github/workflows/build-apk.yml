@@ -29,7 +29,8 @@ jobs:
           ls -la www
       - name: Capacitor + Android
         run: |
-          npm i --no-save @capacitor/core @capacitor/cli @capacitor/android
+          # sharp ставим ВМЕСТЕ с capacitor: отдельный `npm i --no-save` вычищает пакеты, не записанные в package.json (в т.ч. @capacitor/android)
+          npm i --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 sharp
           npx cap init "ANODE SURVIVAL" com.anode.survival --web-dir www
           npx cap add android
           npx cap sync android
@@ -37,7 +38,6 @@ jobs:
           R=android/app/src/main/res
           rm -f $R/mipmap-anydpi-v26/ic_launcher.xml $R/mipmap-anydpi-v26/ic_launcher_round.xml
           rm -f $R/drawable-v24/ic_launcher_foreground.xml $R/drawable/ic_launcher_background.xml
-          npm i --no-save sharp
           node tools/make-icons.js
           M=android/app/src/main/AndroidManifest.xml
           # allowBackup уже есть в шаблоне манифеста — заменяем значение, а не добавляем дубль атрибута
