@@ -222,7 +222,7 @@ def api_auth(kind, d, ip):
 DB.executescript('''CREATE TABLE IF NOT EXISTS wallet(u TEXT PRIMARY KEY, coins INTEGER DEFAULT 0, admin INTEGER DEFAULT 0, promos TEXT DEFAULT '');''')
 PROMOS = {'OSIL2026': 100, 'RUSTLIKE': 50, 'TESTER': 25}; ADMIN_CODE, ADMIN_COINS = 'ADMIN6737', 1000
 def wallet(u):
-    q('INSERT OR IGNORE INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?)', (u, ''))
+    q('INSERT INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?) ON CONFLICT(u) DO NOTHING', (u, ''))
     r = qa('SELECT coins,admin,promos FROM wallet WHERE u=?', (u,))[0]; return {'coins': r[0] or 0, 'admin': bool(r[1]), 'promos': [x for x in (r[2] or '').split(',') if x]}
 def level_of(kills, playtime): return 1 + int(math.sqrt(max(0, (playtime or 0) / 60.0 * 2 + (kills or 0) * 10)))
 def me_info(u):
@@ -279,7 +279,7 @@ def api_admin(d):
         for t_, k_ in (('accounts', 'u'), ('sessions', 'u'), ('players', 'tok'), ('wallet', 'u')): q(f'DELETE FROM {t_} WHERE {k_}=?', (t,))
     elif op == 'reset':   # обнуление прогресса: инвентарь, позиция, статистика, монеты
         kick_user(t, 'Ваш прогресс обнулён'); q('DELETE FROM players WHERE tok=?', (t,)); q("UPDATE wallet SET coins=0, promos='' WHERE u=?", (t,))
-    elif op == 'setcoins': q('INSERT OR IGNORE INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?)', (t, '')); q('UPDATE wallet SET coins=? WHERE u=?', (max(0, min(10**9, int(d.get('v', 0)))), t))
+    elif op == 'setcoins': q('INSERT INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?) ON CONFLICT(u) DO NOTHING', (t, '')); q('UPDATE wallet SET coins=? WHERE u=?', (max(0, min(10**9, int(d.get('v', 0)))), t))
     else: return 400, {'error': 'Неизвестная команда'}
     print(f'* админ {me}: {op} {t}'); return 200, {'ok': True}
 
