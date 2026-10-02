@@ -33,6 +33,16 @@ jobs:
           npx cap init "ANODE SURVIVAL" com.anode.survival --web-dir www
           npx cap add android
           npx cap sync android
+          # Иконка приложения: Capacitor ставит свою стандартную, поэтому подменяем её на нашу (1/icon-512.png)
+          R=android/app/src/main/res
+          rm -f $R/mipmap-anydpi-v26/ic_launcher.xml $R/mipmap-anydpi-v26/ic_launcher_round.xml
+          rm -f $R/drawable-v24/ic_launcher_foreground.xml $R/drawable/ic_launcher_background.xml
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            n=${d%%:*}; s=${d##*:}; mkdir -p $R/mipmap-$n
+            convert 1/icon-512.png -resize ${s}x${s} $R/mipmap-$n/ic_launcher.png
+            convert 1/icon-512.png -resize ${s}x${s} -alpha set \( +clone -alpha transparent -fill white -draw "circle $((s/2)),$((s/2)) $((s/2)),0" \) -compose DstIn -composite $R/mipmap-$n/ic_launcher_round.png
+            cp $R/mipmap-$n/ic_launcher.png $R/mipmap-$n/ic_launcher_foreground.png
+          done
           M=android/app/src/main/AndroidManifest.xml
           # allowBackup уже есть в шаблоне манифеста — заменяем значение, а не добавляем дубль атрибута
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' $M
