@@ -7,11 +7,10 @@
     margin:0; padding:0; width:100%; height:100%; overflow:hidden;
     background:#111; font-family: 'Segoe UI', Roboto, Arial, sans-serif;
     -webkit-user-select:none; user-select:none;
-    padding-top: env(safe-area-inset-top,0px);
-    padding-bottom: env(safe-area-inset-bottom,0px);
+    position:fixed; inset:0; height:100dvh; background:#000;
   }
   .hidden{ display:none!important; }
-  #app{ position:fixed; inset:0; }
+  #app{ position:fixed; inset:0; width:100vw; height:100dvh; }
   canvas{ display:block; width:100%; height:100%; touch-action:none; }
 
   #crosshair{
@@ -48,13 +47,13 @@
   #look-zone{ position:fixed; bottom:0; right:0; width:55%; height:100%; z-index:9; }
   #joystick-base{
     position:fixed; width:110px; height:110px;
-    background:url('../assets/icons/base-joystick.webp') center/contain no-repeat;
+    background:url('../1/base-joystick.webp') center/contain no-repeat;
     display:none; z-index:11; pointer-events:none;
     opacity:0.85; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));
   }
   #joystick-knob{
     position:fixed; width:52px; height:52px;
-    background:url('../assets/icons/stick-joystick.webp') center/contain no-repeat;
+    background:url('../1/stick-joystick.webp') center/contain no-repeat;
     display:none; z-index:12; pointer-events:none;
     filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));
   }
@@ -90,7 +89,7 @@
   }
   #menuBg{
     position:absolute; inset:0;
-    background:url('../assets/icons/menu-bg-update.webp') center/cover no-repeat, #180f0c;
+    background:url('../1/menu-bg-update.webp') center/cover no-repeat, #180f0c;
     filter:brightness(.85); transform:scale(1.06);
   }
   .mcol{ position:relative; height:100%; }
@@ -98,7 +97,7 @@
     width:76px; background:rgba(20,16,14,.75); display:flex; flex-direction:column;
     align-items:center; padding-top:24px; gap:36px; flex-shrink:0;
   }
-  .m-logo{ width:52px; height:52px; background:url('../assets/icons/coin.webp') center/contain no-repeat; }
+  .m-logo{ width:52px; height:52px; background:url('../1/coin.webp') center/contain no-repeat; }
   .m-gear{
     font-size:26px; color:#c9c9c9; background:rgba(70,66,62,.6); width:46px; height:46px;
     border-radius:4px; border:none; cursor:pointer;
@@ -138,13 +137,13 @@
     width:130px; background:rgba(20,16,14,.75); display:flex; flex-direction:column;
     align-items:center; padding-top:20px; gap:6px; flex-shrink:0;
   }
-  .m-ava{ width:64px; height:64px; background:url('../assets/icons/default-avatar.webp') center/cover no-repeat; border-radius:4px; }
+  .m-ava{ width:64px; height:64px; background:url('../1/default-avatar.webp') center/cover no-repeat; border-radius:4px; }
   .m-lvl{
     width:28px; height:28px; border-radius:50%; background:#5f7f3a; border:1px solid #86a65c;
     display:flex; align-items:center; justify-content:center; font-size:13px;
   }
   .m-coins{ display:flex; align-items:center; gap:5px; font-size:13px; }
-  .m-coins i{ display:inline-block; width:16px; height:16px; background:url('../assets/icons/coin.webp') center/contain no-repeat; }
+  .m-coins i{ display:inline-block; width:16px; height:16px; background:url('../1/coin.webp') center/contain no-repeat; }
   .m-ver{ position:absolute; bottom:8px; right:10px; font-size:10px; color:#8d8781; }
   @media (max-width:820px){
     .m-tabs{ width:150px; } .m-side{ width:56px; } .m-logo{ width:38px; height:38px; }
@@ -390,7 +389,7 @@ body.is-dragging #inv-panel, body.is-dragging #inv-grid{ touch-action:none; over
 /* ---- экран загрузки ---- */
 #loading-screen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#120d0b;color:#e8e8e8;transition:opacity .5s ease}
 #loading-screen.out{opacity:0;pointer-events:none}
-#loading-screen .ld-bg{position:absolute;inset:0;background:url('../assets/icons/menu-bg-update.webp') center/cover no-repeat,#180f0c;filter:brightness(.45) blur(2px);transform:scale(1.06)}
+#loading-screen .ld-bg{position:absolute;inset:0;background:url('../1/menu-bg-update.webp') center/cover no-repeat,#180f0c;filter:brightness(.45) blur(2px);transform:scale(1.06)}
 .ld-box{position:relative;width:min(440px,84vw)}
 .ld-title{font-size:34px;font-weight:800;letter-spacing:6px;text-align:center}
 .ld-title span{display:block;font-size:12px;letter-spacing:9px;color:#d9a441;margin-top:2px}
@@ -459,7 +458,7 @@ body.is-dragging #inv-panel, body.is-dragging #inv-grid{ touch-action:none; over
 
 #build-hud{
   position:fixed; z-index:12; left:50%; transform:translateX(-50%);
-  top:calc(8px + env(safe-area-inset-top,0px)); display:none; flex-direction:column; align-items:center; gap:5px;
+  top:calc(34px + env(safe-area-inset-top,0px)); display:none; flex-direction:column; align-items:center; gap:5px;
   pointer-events:none; max-width:70vw;
 }
 #build-hud.show{ display:flex; }
@@ -523,7 +522,8 @@ body.is-dragging #inv-panel, body.is-dragging #inv-grid{ touch-action:none; over
 /* Пока открыт инвентарь / крафт / карта — весь игровой HUD скрыт */
 body.ui-open #hud-bars, body.ui-open #ammo-hud, body.ui-open #hotbar, body.ui-open .round-btn, body.ui-open #minimap,
 body.ui-open #crosshair, body.ui-open #crit-marker, body.ui-open #harvest-progress,
-body.ui-open #build-hud, body.ui-open #fps-counter{ display:none !important; }
+body.ui-open #build-hud, body.ui-open #fps-counter,
+body.ui-open #craft-queue, body.ui-open #part-hp, body.ui-open #hm-prompt, body.ui-open #net-chat-btn, body.ui-open #copter-btn{ display:none !important; }
 
 /* ---- Кнопка паузы (HUD) и меню паузы ---- */
 #btn-pause{ top:calc(10px + env(safe-area-inset-top,0px)); right:190px; width:52px; height:52px; }
@@ -559,9 +559,10 @@ body.ui-open #build-hud, body.ui-open #fps-counter{ display:none !important; }
 #layout-bar .lo-t{ font-size:13px; letter-spacing:.4px; margin-bottom:10px; }
 #layout-bar .lo-b{ display:flex; gap:8px; justify-content:center; }
 #layout-bar button{ padding:8px 16px; border:none; font-size:12px; letter-spacing:.6px; color:#fff; background:rgba(64,64,64,.95); font-family:inherit; }
+#layout-bar #lo-copy{ background:rgba(40,110,150,.95); }
 #layout-bar #lo-done{ background:rgba(96,130,50,.95); }
 body.layout-edit, body.layout-edit *{ touch-action:none; }
-body.layout-edit #btn-hit, body.layout-edit #btn-jump, body.layout-edit #btn-crouch, body.layout-edit #btn-inv,
+body.layout-edit #btn-run, body.layout-edit #btn-hit, body.layout-edit #btn-jump, body.layout-edit #btn-crouch, body.layout-edit #btn-inv,
 body.layout-edit #btn-craft, body.layout-edit #btn-map, body.layout-edit #btn-pause, body.layout-edit #hotbar,
 body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-btn, body.layout-edit #minimap, body.layout-edit #fps-counter{
   outline:2px dashed #9db07a; outline-offset:2px; pointer-events:auto !important; cursor:move;
@@ -583,7 +584,7 @@ body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-bt
 .ic-gear{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM10.6 2h2.8l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.4 2.4-2 1.7c.1.6.1 1.2 0 1.8l2 1.7-1.4 2.4-2.5-.9c-.5.4-1.1.7-1.7.9L13.4 19h-2.8l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.4-2.4 2-1.7a6 6 0 010-1.8l-2-1.7 1.4-2.4 2.5.9c.5-.4 1.1-.7 1.7-.9z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM10.6 2h2.8l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.4 2.4-2 1.7c.1.6.1 1.2 0 1.8l2 1.7-1.4 2.4-2.5-.9c-.5.4-1.1.7-1.7.9L13.4 19h-2.8l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.4-2.4 2-1.7a6 6 0 010-1.8l-2-1.7 1.4-2.4 2.5.9c.5-.4 1.1-.7 1.7-.9z'/%3E%3C/svg%3E")}
 
 #start-screen{ flex-direction:column; font-family:var(--rf); color:var(--rt); background:#0f0e0d; }
-#start-screen #menuBg{ background:url('../assets/icons/menu-bg-update.webp') center/cover no-repeat, #181310;
+#start-screen #menuBg{ background:url('../1/menu-bg-update.webp') center/cover no-repeat, #181310;
   filter:brightness(.72) saturate(.9) blur(1px); transform:scale(1.08); animation:mKen 40s ease-in-out infinite alternate; }
 @keyframes mKen{ from{ transform:scale(1.08) translate(0,0);} to{ transform:scale(1.16) translate(-1.5%,-1%);} }
 .m-vig{ position:absolute; inset:0; pointer-events:none;
@@ -593,7 +594,7 @@ body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-bt
   padding:0 calc(10px + env(safe-area-inset-right,0px)) 0 calc(10px + env(safe-area-inset-left,0px));
   background:linear-gradient(180deg, rgba(20,20,19,.96), rgba(20,20,19,.82)); border-bottom:1px solid rgba(255,255,255,.06); }
 .m-brand{ display:flex; align-items:center; gap:8px; min-width:0; }
-#start-screen .m-logo{ width:30px; height:30px; background:var(--rr) url('../assets/icons/coin.webp') center/70% no-repeat; border-radius:0; }
+#start-screen .m-logo{ width:30px; height:30px; background:var(--rr) url('../1/coin.webp') center/70% no-repeat; border-radius:0; }
 .m-brand b{ font-size:20px; letter-spacing:3px; font-weight:800; }
 .m-nav{ flex:1; display:flex; justify-content:center; height:100%; gap:2px; }
 #start-screen .m-tab{ position:relative; display:flex; align-items:center; gap:7px; padding:0 clamp(10px,2.2vw,26px);
@@ -620,7 +621,7 @@ body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-bt
 .m-qrow span{ font-size:11px; color:var(--rd); }
 .m-qrow i{ width:22px; height:22px; color:#777; } .m-qrow:hover i{ color:var(--rg); }
 .m-news{ position:absolute; left:calc(14px + env(safe-area-inset-left,0px)); bottom:12px; width:min(190px,30vw); aspect-ratio:16/9; cursor:pointer; overflow:hidden; border:1px solid rgba(255,255,255,.14); }
-.m-newsimg{ position:absolute; inset:0; background:url('../assets/icons/menu-bg-update.webp') center/cover; transition:transform .4s; }
+.m-newsimg{ position:absolute; inset:0; background:url('../1/menu-bg-update.webp') center/cover; transition:transform .4s; }
 .m-news:hover .m-newsimg{ transform:scale(1.08); }
 .m-news b{ position:absolute; left:8px; bottom:6px; font-size:14px; letter-spacing:.5px; text-shadow:0 1px 3px #000; }
 .m-news::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.75)); }
@@ -695,7 +696,7 @@ body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-bt
 
 /* ---------- пауза ---------- */
 #pause-menu{ background:linear-gradient(90deg, rgba(8,8,8,.9) 0%, rgba(8,8,8,.62) 42%, rgba(8,8,8,.2) 100%); backdrop-filter:blur(3px); font-family:var(--rf); }
-.pm-logo{ display:flex; align-items:center; gap:10px; } .pm-logo span{ width:clamp(34px,8vh,50px); height:clamp(34px,8vh,50px); background:var(--rr) url('../assets/icons/coin.webp') center/70% no-repeat; }
+.pm-logo{ display:flex; align-items:center; gap:10px; } .pm-logo span{ width:clamp(34px,8vh,50px); height:clamp(34px,8vh,50px); background:var(--rr) url('../1/coin.webp') center/70% no-repeat; }
 .pm-logo b{ font-size:clamp(28px,7vh,44px); font-weight:800; letter-spacing:4px; line-height:1; }
 .pm-sub{ color:var(--rd); letter-spacing:4px; }
 .pm-btns{ gap:0; }
@@ -734,18 +735,18 @@ body.has-gun .gun-btn{ display:flex; }
 @media (max-height:400px){ #btn-aim{ right:196px; bottom:calc(168px + env(safe-area-inset-bottom,0px)); } #btn-reload{ right:196px; bottom:calc(100px + env(safe-area-inset-bottom,0px)); } }
 
 /* ---- худ оружия: в стиле статусов, счётчик патронов другим шрифтом ---- */
-#ammo-hud{ position:fixed; right:210px; bottom:calc(8px + env(safe-area-inset-bottom,0px)); z-index:15; display:none; align-items:stretch;
+#ammo-hud{ box-sizing:border-box; width:196px; height:44px; overflow:hidden; position:fixed; right:210px; bottom:calc(8px + env(safe-area-inset-bottom,0px)); z-index:15; display:none; align-items:stretch;
   gap:0; background:rgba(34,33,31,.78); pointer-events:none; }
 #ammo-hud.on, body.layout-edit #ammo-hud{ display:flex; }
-#ammo-hud .ah-ico{ width:56px; height:44px; display:flex; align-items:center; justify-content:center; background:rgba(40,39,37,.62); }
+#ammo-hud .ah-ico{ flex:none; width:56px; height:44px; display:flex; align-items:center; justify-content:center; background:rgba(40,39,37,.62); }
 #ammo-hud .ah-ico img{ width:48px; height:48px; object-fit:contain; filter:invert(1) brightness(1.2); }
-#ammo-hud .ah-txt{ padding:3px 10px 3px 8px; display:flex; flex-direction:column; justify-content:center; min-width:82px; }
-#ammo-hud .ah-name{ font:600 9px/1 var(--rf); letter-spacing:1px; color:#b9b6b0; }
-#ammo-hud .ah-cnt{ font:700 26px/1.05 'Bahnschrift','DIN Alternate','Impact','Arial Narrow',monospace; color:#fff; letter-spacing:1px; text-shadow:0 1px 2px #000; }
+#ammo-hud .ah-txt{ padding:3px 10px 3px 8px; display:flex; flex-direction:column; justify-content:center; flex:1 1 0; min-width:0; overflow:hidden; }
+#ammo-hud .ah-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font:600 9px/1 var(--rf); letter-spacing:1px; color:#b9b6b0; }
+#ammo-hud .ah-cnt{ white-space:nowrap; font:700 26px/1.05 'Bahnschrift','DIN Alternate','Impact','Arial Narrow',monospace; color:#fff; letter-spacing:1px; text-shadow:0 1px 2px #000; }
 #ammo-hud #ah-res{ font-size:16px; color:#b9b6b0; }
 /* кнопки прицела/перезарядки — белые, как остальные */
-.gun-btn{ background:rgba(34,33,31,.6) !important; border:2px solid #fff !important; color:#fff !important; }
-.gun-btn.active{ background:rgba(255,255,255,.3) !important; border-color:#fff !important; }
+.gun-btn{ background:none !important; border:none !important; }
+.gun-btn.active img{ filter:brightness(1.5) drop-shadow(0 0 5px #fff) !important; }
 #btn-aim circle:last-of-type{ fill:#fff; }
 
 /* ---- платформа ПК: скрываем сенсорные элементы ---- */
@@ -763,3 +764,16 @@ body.has-gun .gun-btn{ display:flex; }
 .round-btn, .round-btn *{ -webkit-tap-highlight-color:transparent; outline:none; }
 .round-btn.active img, .round-btn:active img{ filter:drop-shadow(0 1px 2px rgba(0,0,0,0.7)) !important; }
 #btn-run.active, #btn-crouch.active{ filter:none !important; }
+
+/* панель двери */
+#door-prompt{ position:fixed; left:50%; bottom:calc(150px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); z-index:16; display:none; gap:8px; }
+#door-prompt.show{ display:flex; }
+#door-prompt button{ padding:10px 16px; border:none; font:600 12px/1 var(--rf,sans-serif); letter-spacing:.8px; color:#fff; background:rgba(34,33,31,.82); }
+#door-prompt button:active{ background:rgba(96,130,50,.95); }
+body.ui-open #door-prompt, body.layout-edit #door-prompt{ display:none !important; }
+
+/* два слота: броня и рюкзак рядом */
+#inv-paperdoll{ grid-template-columns:repeat(2,minmax(0,56px)) !important; gap:6px !important; }
+.eq-pack{ grid-column:auto !important; aspect-ratio:1 !important; }
+
+body.hud-off #hud-bars, body.hud-off #hotbar, body.hud-off #minimap, body.hud-off #crosshair, body.hud-off #fps-counter, body.hud-off #net-hud{ display:none !important; }
