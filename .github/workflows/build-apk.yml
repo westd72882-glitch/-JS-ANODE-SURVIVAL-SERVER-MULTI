@@ -22,7 +22,7 @@ jobs:
           mkdir -p ws/js && cp -r index.html css assets 1 ws/ && cp js/*.js ws/js/ && cp node_modules/three/build/three.min.js ws/
           for f in ws/js/*.js; do
             [ "$f" = "ws/js/register-sw.js" ] && continue
-            npx javascript-obfuscator "$f" --output "$f" --compact true --string-array true --string-array-encoding base64 --string-array-threshold 0.75 --identifier-names-generator hexadecimal
+            npx javascript-obfuscator "$f" --output "$f" --compact true --string-array false --identifier-names-generator hexadecimal --self-defending false --debug-protection false
           done
           node tools/pack.js ws www
           npx javascript-obfuscator www/b.js --output www/b.js --compact true --control-flow-flattening true --control-flow-flattening-threshold 0.6 --dead-code-injection true --dead-code-injection-threshold 0.3 --string-array true --string-array-encoding rc4 --string-array-threshold 1 --identifier-names-generator hexadecimal --split-strings true --split-strings-chunk-length 5
