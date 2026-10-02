@@ -1,5 +1,5 @@
 {
-  "name": "ANODE localhost",
+  "name": "ANODE server",
   "port": 8000,
   "max": 16,
   "motd": "",

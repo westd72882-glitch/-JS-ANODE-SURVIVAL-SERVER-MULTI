@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <title>ANODE SURVIVAL</title>
 
 <!-- PWA -->
@@ -14,11 +14,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ANODE SURVIVAL">
-<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="1/icon-192.png">
 
 <!-- Android/Chrome -->
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="icon" href="1/icon-192.png">
 
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -93,7 +93,7 @@
       <div class="m-pinfo"><div id="m-pName">Игрок</div><div class="m-coins"><i></i><span id="m-pCoins">0</span></div></div>
       <div class="m-lvl" id="m-pLvl">1</div>
     </div>
-    <div class="m-ver">ANODE 1.0 alpha · v40</div>
+    <div class="m-ver">ANODE 1.0 alpha · v73</div>
     <button class="m-play" id="start-btn"><i class="ic-play"></i>ИГРАТЬ</button>
   </footer>
 </div>
@@ -116,7 +116,7 @@
 
 <div id="app">
   <div id="crosshair"></div>
-  <img id="crit-marker" src="assets/icons/CriticalHit_Marker.webp" alt="">
+  <img id="crit-marker" src="1/CriticalHit_Marker.webp" alt="">
 
 
   <div id="fps-counter">-- FPS</div>
@@ -136,16 +136,16 @@
   </div>
 
   <div id="action-buttons">
-    <div class="round-btn" id="btn-inv"><img src="assets/icons/inventory-button.webp" alt=""></div>
-    <div class="round-btn" id="btn-craft"><img src="assets/icons/crafting-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-inv"><img src="1/inventory-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-craft"><img src="1/crafting-button.webp" alt=""></div>
     <div class="round-btn" id="btn-pause" aria-label="Пауза"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27"/><rect x="22" y="20" width="6.5" height="24" rx="1.5"/><rect x="35.5" y="20" width="6.5" height="24" rx="1.5"/></svg></div>
-    <div class="round-btn" id="btn-map"><img src="assets/icons/map-button.webp" alt=""></div>
-    <div class="round-btn" id="btn-crouch"><img src="assets/icons/build_button.webp" alt=""></div>
-    <div class="round-btn gun-btn" id="btn-aim"><svg viewBox="0 0 48 48" width="34" height="34"><circle cx="24" cy="24" r="14" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="2.6" fill="#fff"/><path d="M24 4v9M24 35v9M4 24h9M35 24h9" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></div>
-    <div class="round-btn gun-btn" id="btn-reload"><b>R</b></div>
-    <div class="round-btn" id="btn-hit"><img src="assets/icons/strike-button.webp" alt=""></div>
-    <div class="round-btn" id="btn-jump"><img src="assets/icons/jump-button.webp" alt=""></div>
-    <div class="round-btn" id="btn-run"><img src="assets/icons/run-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-map"><img src="1/map-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-crouch"><img src="1/build_button.webp" alt=""></div>
+    <div class="round-btn gun-btn" id="btn-aim"><img src="1/aim-button.webp" alt=""></div>
+    <div class="round-btn gun-btn" id="btn-reload"><img src="1/reload-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-hit"><img src="1/strike-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-jump"><img src="1/jump-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-run"><img src="1/run-button.webp" alt=""></div>
   </div>
 
   <div id="hotbar">
@@ -166,10 +166,7 @@
       <div id="inv-left">
         <div class="inv-title">ЭКИПИРОВКА</div>
         <div id="inv-paperdoll">
-          <div class="eq-slot" data-eq="head" data-name="ШЛЕМ"></div>
-          <div class="eq-slot" data-eq="chest" data-name="ТОРС"></div>
-          <div class="eq-slot" data-eq="legs" data-name="НОГИ"></div>
-          <div class="eq-slot" data-eq="feet" data-name="ОБУВЬ"></div>
+          <div class="eq-slot" data-eq="chest" data-name="БРОНЯ"></div>
           <div class="eq-slot eq-pack" data-eq="pack" data-name="РЮКЗАК"></div>
         </div>
         <div id="inv-detail"><div class="idt-empty">Выберите предмет</div></div>
@@ -231,7 +228,7 @@
   <div id="map-panel">
     <canvas id="map-canvas"></canvas>
     <div id="map-hud"></div>
-    <button id="close-map" aria-label="Закрыть"><img src="assets/icons/X.webp" alt=""></button>
+    <button id="close-map" aria-label="Закрыть"><img src="1/X.webp" alt=""></button>
     <div id="map-hint">Щипок двумя пальцами — масштаб, перетаскивание — сдвиг</div>
   </div>
 
@@ -252,6 +249,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/worldgen.js"></script>
 <script src="js/textures.js"></script>
+<script src="js/roadtex.js"></script>
 <script src="js/tools3d.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/audio.js"></script>
