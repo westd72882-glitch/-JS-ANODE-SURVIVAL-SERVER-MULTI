@@ -6713,7 +6713,7 @@ window.OSIL_NET = (function(){
   function disconnect(){ const w = ws; ws = null; if(w){ w.onclose = null; try{ w.close(); }catch(e){} } cleanup(); }
   function connect(s){
     disconnect(); if(!s || s.solo) return;
-    const au = authAll()[authKey(s)]; if(!au){ showAuth(s); return; } curSrv = s;
+    const au = authAll()[authKey(s)]; if(!au){ toast('Сначала войдите в аккаунт'); return; } curSrv = s;
     const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + hostPort(s) + '/ws';
     let w; try{ w = new WebSocket(url); }catch(e){ toast('Неверный адрес сервера'); return; }
     ws = w;
@@ -6768,18 +6768,22 @@ window.OSIL_NET = (function(){
     setPName(lastUser());
     const rebind = (id, fn) => { const b = $(id); if(!b) return; const n = b.cloneNode(true); b.replaceWith(n); n.addEventListener('click', fn); };
     rebind('m-addServ', addServer); rebind('m-refServ', () => { toast('Поиск серверов…'); refresh().then(()=>toast('Список обновлён')); });
-    /* вход в аккаунт — ДО старта игры: перехватываем «ИГРАТЬ», пока не пройден вход */
-    const sb = $('start-btn'); let passed = false;
-    sb.addEventListener('click', e => {
+    /* вход в аккаунт теперь показывается сразу при открытии меню; при заходе на сервер окно не появляется */
+    const sb = $('start-btn');
+    sb.addEventListener('click', () => {
       const s = mServers[mSelServer];
       if(!s || s.solo){ disconnect(); return; }
-      if(passed){ passed = false; connect(s); return; }
-      e.stopImmediatePropagation(); e.preventDefault();
-      showAuth(s, '', () => { passed = true; sb.click(); });
+      connect(s);
     }, true);
     $('pm-exit').addEventListener('click', disconnect);
     harvestables.forEach((h,i) => { h.nid = i; });
     mServers.length = 0; mServers.push({name:'Локальная игра', sub:'Одиночная · без сети', cur:0, max:1, ping:0, solo:true}); mSelServer = 0; renderMenuServers();
+    {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
+      let u0 = null;
+      try{ if(window.__SERVER){ const u = new URL(window.__SERVER); u0 = {host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80))}; }
+        else if(/^https?:$/.test(location.protocol) && location.hostname) u0 = {host:location.hostname, port:+(location.port || (location.protocol === 'https:' ? 443 : 80))}; }catch(e){}
+      if(u0){ u0.name = 'ANODE'; showAuth(u0, null, () => { refresh(); }, true); }
+    }
     refresh(); setInterval(() => { const ss = $('start-screen'); if(ss && ss.style.display !== 'none' && !document.hidden) refresh(); }, 15000);
     setInterval(() => {                                       // отправка своего состояния 10 раз/с
       if(!on) return;

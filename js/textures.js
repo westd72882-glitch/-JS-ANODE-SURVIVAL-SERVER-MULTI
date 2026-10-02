@@ -51,7 +51,7 @@ TEXTURES.tex_water = "assets/pack/sprites/water.webp";
 TEXTURES.icon_map = "1/map-button.webp";
 
 /* UI-иконки, которые тоже нужно прогреть при загрузке */
-window.EXTRA_IMAGES = ["1/menu-bg-update.webp","1/base-joystick.webp","1/stick-joystick.webp","1/inventory-button.webp","1/crafting-button.webp","1/build_button.webp","1/strike-button.webp","1/jump-button.webp","1/coin.webp","1/default-avatar.webp","1/CriticalHit_Marker.webp"];
+window.EXTRA_IMAGES = ["1/menu-bg-update.webp","1/menu-news.webp","1/base-joystick.webp","1/stick-joystick.webp","1/inventory-button.webp","1/crafting-button.webp","1/build_button.webp","1/strike-button.webp","1/jump-button.webp","1/coin.webp","1/default-avatar.webp","1/CriticalHit_Marker.webp"];
 TEXTURES.icon_door     = TEXTURES.icon_door || "assets/images/Door_Category.webp";
 TEXTURES.icon_cupboard = "1/locker.webp";
 TEXTURES.icon_startrock = "1/start_rock.webp";
