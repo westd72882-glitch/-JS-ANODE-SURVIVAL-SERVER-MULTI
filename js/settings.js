@@ -6,7 +6,7 @@ window.OSIL_SETTINGS=(function(){
     sens:10, invertY:false, joySize:100, btnSize:100,
     res:100, lighting:1, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:3, dist:200, fov:75, bob:100, water:true,
     volMaster:10, volSfx:10, volMusic:10, volSteps:10,
-    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:true, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0
+    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0
   };
   const all=Object.assign({},DEF);
   try{ if(!localStorage.getItem('osil_res_fix')){ localStorage.setItem('osil_res_fix','1'); } }catch(e){}
@@ -15,6 +15,7 @@ window.OSIL_SETTINGS=(function(){
   try{ if(!localStorage.getItem('osil_sens10')){ all.sens=10; localStorage.setItem('osil_sens10','1'); localStorage.setItem(KEY,JSON.stringify(all)); } }catch(e){}
   try{ if(!localStorage.getItem('osil_defaults_v3')){ Object.assign(all,{res:100,lighting:1,shadowFilter:1,texQ:4,aniso:4,waterQ:1,shadows:3,dist:200,shadowDist:120,fov:75,miniSize:70}); localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_defaults_v3','1'); } }catch(e){}
   const subs=[];
+  try{ if(!localStorage.getItem('osil_mini_off')){ all.minimap=false; localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_mini_off','1'); } }catch(e){}
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(all)); }catch(e){} }
   function emit(k){ subs.forEach(f=>{ try{ f(k,all[k],all); }catch(e){ console.error(e); } }); }
   function set(k,v){ all[k]=v; save(); emit(k); }

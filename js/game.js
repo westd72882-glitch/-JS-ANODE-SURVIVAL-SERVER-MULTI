@@ -2592,14 +2592,15 @@ function findSlots(k){ return allSlotRefs().concat(equipRefs()).filter(r=>{const
 
 let ADMIN_FREE = false;
 try{ ADMIN_FREE = localStorage.getItem('osil_admin')==='1'; }catch(e){}
-function adminGrantRes(){ ['wood','stone','metal'].forEach(k=>addItem(k,1000)); }   // промокод Admin6737: +1000 дерева, камня, железа
+function adminGrantRes(){ ['wood','stone','metal'].forEach(k=>{ const n=1000-countItem(k); if(n>0) addItem(k,n); }); }   // докидывает до 1000
+function adminFree(){ return ADMIN_FREE || !!(window.OSIL_ACC && OSIL_ACC.isAdmin && OSIL_ACC.isAdmin()); }   // локальный промокод ИЛИ админ на сервере   // промокод Admin6737: +1000 дерева, камня, железа
 if(ADMIN_FREE) adminGrantRes();
 window.OSIL_ADMIN = { ok(){ return ADMIN_FREE && !(window.OSIL_NET && OSIL_NET.on); }, setTime(f){ gameClock = ((f%1)+1)%1*CYCLE_LEN; skyTimer = 99; }, getTime(){ return gameClock/CYCLE_LEN; } };
 const DONATE_ITEMS = ['copter','quarry'];
 function donLocked(id){ return DONATE_ITEMS.includes(id) && !(window.OSIL_ACC && OSIL_ACC.owns(id)); }
 function canCraft(r, qty){
   if(donLocked(r.give && (r.give.item||r.give.tool))) return false;
-  if(ADMIN_FREE) return true;
+  if(adminFree()) return true;
   if(!Object.keys(r.cost).every(k => countItem(k) >= r.cost[k]*qty)) return false;
   return true;
 }
@@ -2625,7 +2626,7 @@ function craftItem(id, qty){
   if(!canCraft(r, qty)){ showToast('Недостаточно ресурсов'); window.OSIL_AUDIO&&OSIL_AUDIO.play('rust-door-denied'); return; }
   const ex = craftQueue.find(q=>q.id===id);
   if(!ex && craftQueue.length >= CRAFT_Q_MAX){ showToast('Очередь: не больше '+CRAFT_Q_MAX+' разных предметов'); window.OSIL_AUDIO&&OSIL_AUDIO.play('rust-door-denied'); return; }
-  if(ADMIN_FREE){                                  // промокод: мгновенный крафт, без очереди и ресурсов
+  if(adminFree()){                                  // админ: мгновенный крафт, без очереди и ресурсов
     const key = r.give.tool || r.give.item, want = (r.give.amount||1)*qty;
     if(roomFor(key) < want){ showToast('Нет места для: '+r.name); window.OSIL_AUDIO&&OSIL_AUDIO.play('rust-door-denied'); return; }
     addItem(key, want); pushRecent(r.id); showToast('Готово: '+r.name+(want>1?' ×'+want:'')); window.OSIL_AUDIO&&OSIL_AUDIO.play('build');
@@ -2639,7 +2640,7 @@ function craftItem(id, qty){
 }
 function craftCancel(i){
   const q = craftQueue[i]; if(!q) return; const r = CRAFT_RECIPES.find(x=>x.id===q.id);
-  if(!ADMIN_FREE) Object.keys(r.cost).forEach(k=>giveItem(k, r.cost[k]*q.qty));   // возврат ресурсов за неготовые партии
+  if(!adminFree()) Object.keys(r.cost).forEach(k=>giveItem(k, r.cost[k]*q.qty));   // возврат ресурсов за неготовые партии
   craftQueue.splice(i,1); renderCraftQueue(); updateResourceUI(); renderCraftUI();
 }
 const cqEl = document.createElement('div'); cqEl.id='craft-queue';
@@ -6705,7 +6706,7 @@ window.OSIL_NET = (function(){
       let r; try{ r = await fetch(c.url+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({token:c.tok}, body||{}))}); }
       catch(e){ return {error:'Сервер недоступен ('+c.url+')'}; }
       try{ return await r.json(); }catch(e){ return {error: r.status===404 ? 'Сервер не обновлён: загрузите новый server.py и перезапустите' : 'Ошибка ответа сервера ('+r.status+')'}; } },
-    async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; } return d; },
+    async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; if(d.admin && !this._ag){ this._ag = 1; try{ adminGrantRes(); updateResourceUI(); renderCraftUI(); }catch(e){} } } return d; },
     isAdmin(){ return !!(this.me && this.me.admin); },
     owns(id){ return !!(this.me && (this.me.items||[]).includes(id)); }
   };
@@ -6731,7 +6732,7 @@ window.OSIL_NET = (function(){
 
   const lastUser = () => { try{ return localStorage.getItem('anode_lastuser') || ''; }catch(e){ return ''; } };
   const hostPort = s => (s.port==443||s.port==80||!s.port) ? s.host : s.host + ':' + s.port;
-  const baseUrl = s => (location.protocol === 'https:' ? 'https://' : 'http://') + hostPort(s);
+  const baseUrl = s => ((location.protocol === 'https:' && !/^(127\.|localhost)/.test(s.host)) ? 'https://' : 'http://') + hostPort(s);
   function setPName(n){ const e = document.getElementById('m-pName'); if(e && n) e.textContent = n; }
   let curSrv = null;
   function showAuth(s, note, onOk, force){
@@ -6806,7 +6807,7 @@ window.OSIL_NET = (function(){
   async function probe(c){
     const ac = new AbortController(), tm = setTimeout(()=>ac.abort(), 3500), t0 = performance.now();
     try{ const r = await fetch(baseUrl(c) + '/api/info', {signal:ac.signal, cache:'no-store'}); const d = await r.json();
-      return Object.assign({}, c, {ips:d.ips || [], name:d.name, cur:d.cur, max:d.max, ping:Math.max(1, Math.round(performance.now()-t0)), ok:true}); }
+      return Object.assign({}, c, {ips:d.ips || [], name:c.name || d.name, cur:d.cur, max:d.max, ping:Math.max(1, Math.round(performance.now()-t0)), ok:true}); }
     catch(e){ return Object.assign({}, c, {ok:false}); } finally{ clearTimeout(tm); }
   }
   let refreshing = false;
@@ -6815,11 +6816,13 @@ window.OSIL_NET = (function(){
     const cand = new Map(), add = (host, port, src, name) => { const k = norm(host) + ':' + port; if(!cand.has(k)) cand.set(k, {host, port:+port, src, name}); };
     if(window.__SERVER){ try{ const u = new URL(window.__SERVER); add(u.hostname, u.port || (u.protocol === 'https:' ? 443 : 80), 'сервер игры'); }catch(e){} }
     else if(/^https?:$/.test(location.protocol) && location.hostname) add(location.hostname, location.port || (location.protocol === 'https:' ? 443 : 80), 'этот сервер');
+    add('127.0.0.1', 8000, 'локальный', 'Локальный сервер');
+    try{ saved().forEach(x => x && x.host && add(x.host, x.port || 8000, 'сохранённый', x.name)); }catch(e){}
     const res = await Promise.all([...cand.values()].map(probe));
     const seen = new Set(), rows = [];
     res.forEach(c => { const key = c.ok ? c.name + '|' + c.port : c.host + ':' + c.port; if(seen.has(key)) return; seen.add(key); rows.push(c); });
     mServers.length = 0;
-    rows.forEach(c => mServers.push({name: c.ok ? (/^(localhost|127\.|192\.168\.|10\.)/.test(c.host) && !c.name ? 'server anode 1' : c.name) : 'server anode 1', sub: c.ok ? 'Онлайн' : 'нет ответа',
+    rows.forEach(c => mServers.push({name: c.name || (c.ok ? c.name : 'server anode 1'), sub: c.ok ? 'Онлайн' : 'нет ответа',
       cur: c.ok ? c.cur : 0, max: c.ok ? c.max : 0, ping: c.ok ? c.ping : '—', host: c.host, port: c.port, off: !c.ok}));
     if(window.__SERVER && !refresh._sel && mServers.length > 0){ mSelServer = 0; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
     if(mSelServer >= mServers.length) mSelServer = 0;
@@ -6845,7 +6848,7 @@ window.OSIL_NET = (function(){
     }, true);
     $('pm-exit').addEventListener('click', disconnect);
     harvestables.forEach((h,i) => { h.nid = i; });
-    mServers.length = 0; mSelServer = 0; renderMenuServers();
+    mServers.length = 0; mSelServer = 0; mServers.push({name:'Локальный сервер', sub:'проверка…', cur:0, max:0, ping:'—', host:'127.0.0.1', port:8000, off:true}); renderMenuServers();
     {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
       let u0 = null;
       try{ if(window.__SERVER){ const u = new URL(window.__SERVER); u0 = {host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80))}; }
