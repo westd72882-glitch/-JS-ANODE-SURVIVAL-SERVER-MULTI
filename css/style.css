@@ -621,7 +621,7 @@ body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-bt
 .m-qrow span{ font-size:11px; color:var(--rd); }
 .m-qrow i{ width:22px; height:22px; color:#777; } .m-qrow:hover i{ color:var(--rg); }
 .m-news{ position:absolute; left:calc(14px + env(safe-area-inset-left,0px)); bottom:12px; width:min(190px,30vw); aspect-ratio:16/9; cursor:pointer; overflow:hidden; border:1px solid rgba(255,255,255,.14); }
-.m-newsimg{ position:absolute; inset:0; background:url('../1/menu-bg-update.webp') center/cover; transition:transform .4s; }
+.m-newsimg{ position:absolute; inset:0; background:url('../1/menu-news.webp') center/cover; transition:transform .4s; }
 .m-news:hover .m-newsimg{ transform:scale(1.08); }
 .m-news b{ position:absolute; left:8px; bottom:6px; font-size:14px; letter-spacing:.5px; text-shadow:0 1px 3px #000; }
 .m-news::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.75)); }
