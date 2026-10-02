@@ -1658,7 +1658,7 @@ function renderQuarry(){
     document.head.appendChild(st); }
   const ic = k=>ITEM_DEFS[k].icon;
   quEl.innerHTML =
-    '<div class="qh"><img src="assets/images/quarry_icon.webp" alt=""><div><b>КАРЬЕР</b><small id="qu-t"></small></div><div id="qu-x">✖</div></div>'
+    '<div class="qh"><img src="1/quarry.webp" alt=""><div><b>КАРЬЕР</b><small id="qu-t"></small></div><div id="qu-x">✖</div></div>'
    +'<div class="qb"><div style="display:flex;flex-direction:column;gap:6px">'
    +'<div class="qc qfuel"><img src="'+ic('fuel')+'" alt=""><div style="flex:1"><div style="display:flex;justify-content:space-between"><span>Топливо</span><span id="qu-fl" style="color:#b9b6b0"></span></div><div class="qbar"><i id="qu-b"></i></div></div></div>'
    +'<div class="qrow"><button id="qu-f1" class="qbtn"><img src="'+ic('fuel')+'" alt="">+1</button><button id="qu-fa" class="qbtn"><img src="'+ic('fuel')+'" alt="">ВСЁ</button></div></div>'
@@ -1843,7 +1843,7 @@ const GUNS = {
   berdanka:{mag:15, ammo:'ammo_rifle', dmg:35, rate:0.32, reload:2.6, snd:'ak', rate2:0.72, icon:'1/berdanka.webp', name:'ПОЛУАВТОМАТИЧЕСКАЯ ВИНТОВКА', semi:true},
   smg:    {mag:20, ammo:'ammo_pistol', dmg:18, rate:0.085, reload:1.9, snd:'ak', rate2:1.45, icon:'1/smg.webp', name:'ПИСТОЛЕТ-ПУЛЕМЁТ'},
   pistol: {mag:10, ammo:'ammo_pistol', dmg:25, rate:0.2,  reload:1.5, snd:'ak', rate2:1.7, icon:'1/pistol.webp', name:'ПИСТОЛЕТ'},
-  rpg:    {mag:1,  ammo:'rocket', dmg:150, rate:2.2, reload:3.2, snd:'ak', rate2:0.45, icon:'assets/images/rpg_icon.webp', name:'РПГ · РАКЕТА'}
+  rpg:    {mag:1,  ammo:'rocket', dmg:150, rate:2.2, reload:3.2, snd:'ak', rate2:0.45, icon:'1/rpg.webp', name:'РПГ · РАКЕТА'}
 };
 const isGun = k => k==='rifle' || k==='pistol' || k==='berdanka' || k==='smg';
 const isMag = k => isGun(k) || k==='rpg';      // оружие с магазином, прицелом и перезарядкой (включая РПГ)
@@ -2234,10 +2234,10 @@ const ITEM_DEFS = {
   eod_suit:{name:'Военная броня', icon:'1/eod_suit.webp', stack:1, kind:'armor', maxDur:600},
   holo_sight:{name:'Голографический прицел', icon:'1/holo_sight.webp', stack:5, kind:'attach'},
   satchel: {name:'Сатчел-заряд',  icon:TEXTURES.icon_satchel, stack:5, kind:'gear'},
-  grenade: {name:'Граната',       icon:'assets/images/grenade_icon.webp', stack:6, kind:'gear'},
-  rpg:     {name:'РПГ',           icon:'assets/images/rpg_icon.webp', stack:1, kind:'gear'},
-  rocket:  {name:'Ракета',        icon:'assets/images/rocket_icon.webp', stack:4, kind:'gear'},
-  quarry:  {name:'Карьер',        icon:'assets/images/quarry_icon.webp', stack:1, kind:'gear'},
+  grenade: {name:'Граната',       icon:'1/grenade.webp', stack:6, kind:'gear'},
+  rpg:     {name:'РПГ',           icon:'1/rpg.webp', stack:1, kind:'gear'},
+  rocket:  {name:'Ракета',        icon:'1/rocket.webp', stack:4, kind:'gear'},
+  quarry:  {name:'Карьер',        icon:'1/quarry.webp', stack:1, kind:'gear'},
   furnace: {name:'Печка',          icon:TEXTURES.icon_furnace, stack:1, kind:'gear'},
   backpack:{name:'Рюкзак',        icon:TEXTURES.icon_backpack,stack:1, kind:'gear'},
   chest:   {name:'Ящик',          icon:TEXTURES.icon_chest,   stack:1, kind:'gear'},
