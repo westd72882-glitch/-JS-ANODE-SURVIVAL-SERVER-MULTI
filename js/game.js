@@ -2213,7 +2213,7 @@ const ITEM_DEFS = {
   mdoor:   {name:'Железная дверь',icon:TEXTURES.icon_mdoor,stack:10,kind:'comp'},
   door:    {name:'Дверь',         icon:TEXTURES.icon_door,    stack:10, kind:'comp'},
   cupboard:{name:'Шкаф',          icon:TEXTURES.icon_cupboard,stack:5,  kind:'comp'},
-  copter:  {name:'Миникоптер',    icon:'assets/images/copter_icon.webp', stack:1, kind:'gear'},
+  copter:  {name:'Миникоптер',    icon:'1/copter.webp', stack:1, kind:'gear'},
   box:     {name:'Ящик',          icon:TEXTURES.icon_box,     stack:10, kind:'comp'},
   // --- не стакаются (1) ---
   rock:    {name:'Камень',   icon:TEXTURES.icon_startrock, stack:1, kind:'tool'},
