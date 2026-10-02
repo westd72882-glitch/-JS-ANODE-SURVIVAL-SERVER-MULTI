@@ -38,6 +38,17 @@ jobs:
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' $M
           grep -q 'android:screenOrientation' $M || sed -i '0,/<activity/s//<activity android:screenOrientation="sensorLandscape"/' $M
           cat $M
+          # конфликт kotlin-stdlib (1.8.22 vs jdk7/jdk8 1.6.21) — приводим всё к одной версии
+          cat >> android/app/build.gradle <<'EOF2'
+          
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+              }
+          }
+          EOF2
       - name: Сборка APK
         env:
           KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
