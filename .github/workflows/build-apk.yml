@@ -37,6 +37,45 @@ jobs:
           # allowBackup уже есть в шаблоне манифеста — заменяем значение, а не добавляем дубль атрибута
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' $M
           grep -q 'android:screenOrientation' $M || sed -i '0,/<activity/s//<activity android:screenOrientation="sensorLandscape"/' $M
+          # Иммерсивный полноэкранный режим: скрываем статус-бар (время/заряд/сеть) и навигацию, вырез камеры закрашиваем игрой
+          D=android/app/src/main/java/com/anode/survival
+          mkdir -p $D
+          cat > $D/MainActivity.java <<'EOF3'
+          package com.anode.survival;
+
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override public void onCreate(Bundle b) { super.onCreate(b); hideBars(); }
+              @Override public void onResume() { super.onResume(); hideBars(); }
+              @Override public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) hideBars();
+              }
+              private void hideBars() {
+                  Window w = getWindow();
+                  WindowCompat.setDecorFitsSystemWindows(w, false);
+                  w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  if (Build.VERSION.SDK_INT >= 28) {
+                      WindowManager.LayoutParams lp = w.getAttributes();
+                      lp.layoutInDisplayCutoutMode = Build.VERSION.SDK_INT >= 30
+                          ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                          : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                      w.setAttributes(lp);
+                  }
+                  WindowInsetsControllerCompat c = WindowCompat.getInsetsController(w, w.getDecorView());
+                  c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                  c.hide(WindowInsetsCompat.Type.systemBars());
+              }
+          }
+          EOF3
           cat $M
           # конфликт kotlin-stdlib (1.8.22 vs jdk7/jdk8 1.6.21) — приводим всё к одной версии
           cat >> android/app/build.gradle <<'EOF2'
