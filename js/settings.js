@@ -31,7 +31,7 @@ window.OSIL_SETTINGS=(function(){
       {k:'btnSize',t:'range',n:'Размер кнопок действий',min:70,max:140,step:5,u:'%'},
       {t:'action',n:'Расположение кнопок и панелей',label:'ИЗМЕНИТЬ',fn:'edit'},
       {t:'action',n:'Скопировать координаты всех элементов на экране',label:'КОПИРОВАТЬ',fn:'copy'},
-      {t:'action',n:'Вернуть стандартное расположение',label:'СБРОСИТЬ',fn:'reset'}
+      {t:'action',n:'Расположение как на фото (по умолчанию)',label:'ПРИМЕНИТЬ',fn:'reset'}
     ]},
     {id:'gfx',name:'Графика',rows:[
       {t:'head',n:'Качество'},
@@ -81,11 +81,41 @@ window.OSIL_SETTINGS=(function(){
     root.querySelector('#m-setReset').addEventListener('click',()=>{ reset(); render(); });
     render();
   }
+
+  function esc(x){ return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function fdt(t){ if(!t) return '—'; const d=new Date(t*1000); return d.toLocaleDateString('ru-RU')+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
+  async function adminPanel(body){
+    body.innerHTML='<div class="set-head-row">Все зарегистрированные игроки</div><div id="adm-list" style="font-size:12px">Загрузка…</div>';
+    const box=body.querySelector('#adm-list');
+    const load=async()=>{
+      const d=await OSIL_ACC.call('/api/admin',{op:'list'});
+      if(d.error){ box.textContent=d.error; return; }
+      box.innerHTML=d.players.map(p=>'<div style="border:1px solid #55544a;border-radius:8px;padding:8px;margin:6px 0;background:rgba(0,0,0,.25)">'+
+        '<b style="font-size:14px">'+esc(p.u)+'</b> '+(p.admin?'<span style="color:#e8c25a">[админ]</span> ':'')+(p.online?'<span style="color:#8fd16a">● онлайн</span> ':'')+(p.banned?'<span style="color:#e06060">[БАН]</span> ':'')+(p.ipbanned?'<span style="color:#e06060">[IP-БАН]</span>':'')+
+        '<div style="opacity:.85;margin-top:3px">Ур. '+p.level+' · монеты '+p.coins+' · убийств '+p.kills+' · смертей '+p.deaths+' · '+p.min+' мин</div>'+
+        '<div style="opacity:.7">Вход: '+fdt(p.last)+' · создан: '+fdt(p.created)+'</div>'+
+        '<div style="opacity:.7;word-break:break-all">IP: '+esc(p.ips.join(', ')||'—')+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px" data-u="'+esc(p.u)+'">'+
+        ['kick:Кик',p.banned?'unban:Разбан':'ban:Бан','banip:Бан IP','setcoins:Монеты','reset:Обнулить','delete:Удалить'].map(x=>{const a=x.split(':');return '<button class="set-tg on" data-op="'+a[0]+'" style="padding:5px 9px;font-size:12px">'+a[1]+'</button>';}).join('')+'</div></div>').join('')||'Нет игроков';
+      box.querySelectorAll('button[data-op]').forEach(b=>b.addEventListener('click',async()=>{
+        const op=b.dataset.op, u=b.parentNode.dataset.u, body={op,target:u};
+        if(op==='setcoins'){ const v=prompt('Сколько монет у '+u+'?'); if(v===null) return; body.v=parseInt(v)||0; }
+        else if(op==='ban'){ const r=prompt('Причина бана (необязательно)'); if(r===null) return; body.reason=r; }
+        else if(['reset','delete','banip'].includes(op) && !confirm(b.textContent+': '+u+'?')) return;
+        const r=await OSIL_ACC.call('/api/admin',body); if(r.error) alert(r.error); load();
+      }));
+    };
+    load();
+    const rb=document.createElement('button'); rb.className='set-tg on'; rb.textContent='ОБНОВИТЬ'; rb.style.marginTop='6px'; rb.onclick=load; body.appendChild(rb);
+  }
   function render(){
     const tabs=root.querySelector('.set-tabs'), body=root.querySelector('.set-body'), keep=body.scrollTop;
-    tabs.innerHTML=TABS.map(t=>'<button class="set-tab'+(t.id===tabId?' on':'')+'" data-t="'+t.id+'">'+t.name+'</button>').join('');
+    const adm=window.OSIL_ACC && OSIL_ACC.isAdmin();
+    const ALL=adm?TABS.concat([{id:'adm',name:'Админ',rows:[]}]):TABS; if(!adm && tabId==='adm') tabId='ctl';
+    tabs.innerHTML=ALL.map(t=>'<button class="set-tab'+(t.id===tabId?' on':'')+'" data-t="'+t.id+'">'+t.name+'</button>').join('');
     tabs.querySelectorAll('.set-tab').forEach(b=>b.addEventListener('click',()=>{ tabId=b.dataset.t; body.scrollTop=0; render(); }));
-    const tab=TABS.find(t=>t.id===tabId); body.innerHTML='';
+    const tab=ALL.find(t=>t.id===tabId); body.innerHTML='';
+    if(tab.id==='adm'){ adminPanel(body); return; }
     tab.rows.concat(tab.id==='ui' && window.OSIL_ADMIN && OSIL_ADMIN.ok() ? [{t:'admintime',n:'Время суток (админ)',d:'Только в одиночном мире'}] : []).forEach(r=>{
       if(r.t==='head'){ const hd=document.createElement('div'); hd.className='set-head-row'; hd.textContent=r.n; body.appendChild(hd); return; }
       const row=document.createElement('div'); row.className='set-row';

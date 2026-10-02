@@ -4857,7 +4857,24 @@ function endLayout(){
   document.getElementById('pause-menu').classList.remove('hidden');
   updateFpsVisibility();
 }
-function resetLayout(){ layoutData = {}; saveLayout(); applyLayout(); }
+/* раскладка «как на фото»: центры элементов в долях экрана 960×449 */
+const PHOTO_LAYOUT = {'btn-pause':[692,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],'btn-run':[771,222],'btn-jump':[802,329],'btn-crouch':[876,396],
+  'hud-bars':[108,47],'hotbar':[480,413],'fps-counter':[232,14],'btn-hit':[722,329],'btn-aim':[640,300],'btn-reload':[640,230],'ammo-hud':[737,419]};
+function applyPhotoLayout(){
+  const W = window.innerWidth, H = window.innerHeight; layoutData = {};
+  const hadGun = document.body.classList.contains('has-gun'); document.body.classList.add('has-gun');
+  const ah = document.getElementById('ammo-hud'), ahd = ah ? ah.style.display : ''; if(ah) ah.style.display = 'flex';
+  LAYOUT_IDS.forEach(id=>{ const el = document.getElementById(id); if(el) el.style.translate = ''; });
+  Object.keys(PHOTO_LAYOUT).forEach(id=>{
+    const el = document.getElementById(id); if(!el) return; const r = el.getBoundingClientRect(); if(!r.width) return;
+    const tx = PHOTO_LAYOUT[id][0]/960*W, ty = PHOTO_LAYOUT[id][1]/449*H;
+    layoutData[id] = [(tx-(r.left+r.width/2))/W, (ty-(r.top+r.height/2))/H];
+  });
+  if(!hadGun) document.body.classList.remove('has-gun'); if(ah) ah.style.display = ahd;
+  saveLayout(); applyLayout();
+}
+function resetLayout(){ applyPhotoLayout(); }
+try{ if(!localStorage.getItem(LAYOUT_KEY)) setTimeout(applyPhotoLayout, 300); }catch(e){}
 document.getElementById('lo-done').addEventListener('click', endLayout);
 document.getElementById('lo-reset').addEventListener('click', resetLayout);
 
@@ -6325,6 +6342,14 @@ document.getElementById('m-promoBtn').addEventListener('click', ()=>{
   const code = document.getElementById('m-promoIn').value.trim().toUpperCase().replace(/^АДМИН/, 'ADMIN');
   const msg = document.getElementById('m-promoMsg');
   if(!code) return;
+  if(window.OSIL_ACC && OSIL_ACC.sess()){
+    OSIL_ACC.call('/api/promo', {code}).then(d=>{
+      if(d.error){ msg.textContent=d.error; msg.style.color='#d08080'; return; }
+      OSIL_ACC.me = d; mCoins = d.coins; document.getElementById('m-pCoins').textContent = d.coins; document.getElementById('m-pLvl').textContent = d.level;
+      msg.textContent = d.msg; msg.style.color = '#bcd096';
+    });
+    return;
+  }
   if(code==='ADMIN6737'){
     ADMIN_FREE = true; try{ localStorage.setItem('osil_admin','1'); }catch(e){}
     adminGrantRes();
@@ -6664,7 +6689,17 @@ window.OSIL_NET = (function(){
   const LS_AUTH = 'anode_auth', authKey = s => s.host + ':' + s.port;
   const SESS = {};   /* сессии только в памяти: при каждом запуске игры вход нужно пройти заново */
   const authAll = () => SESS;
-  const authSet = (s, v) => { if(v){ SESS[authKey(s)] = v; try{ localStorage.setItem('anode_lastuser', v.u); }catch(e){} } else delete SESS[authKey(s)]; };
+  const authSet = (s, v) => { if(v){ SESS[authKey(s)] = v; try{ localStorage.setItem('anode_lastuser', v.u); }catch(e){} curSrv = s; setTimeout(()=>window.OSIL_ACC.refresh(), 50); } else delete SESS[authKey(s)]; };
+  /* серверный аккаунт: монеты, уровень, админ-права и админ-запросы — всё хранится в БД сервера */
+  window.OSIL_ACC = {
+    me:null,
+    sess(){ const s = curSrv || mServers[mSelServer]; if(!s || s.solo) return null; const a = authAll()[authKey(s)]; return a ? {url:baseUrl(s), tok:a.t} : null; },
+    async call(path, body){ const c = this.sess(); if(!c) return {error:'Нет входа на сервер'};
+      try{ const r = await fetch(c.url+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({token:c.tok}, body||{}))}); return await r.json(); }
+      catch(e){ return {error:'Сервер недоступен'}; } },
+    async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; } return d; },
+    isAdmin(){ return !!(this.me && this.me.admin); }
+  };
   const lastUser = () => { try{ return localStorage.getItem('anode_lastuser') || ''; }catch(e){ return ''; } };
   const hostPort = s => (s.port==443||s.port==80||!s.port) ? s.host : s.host + ':' + s.port;
   const baseUrl = s => (location.protocol === 'https:' ? 'https://' : 'http://') + hostPort(s);
