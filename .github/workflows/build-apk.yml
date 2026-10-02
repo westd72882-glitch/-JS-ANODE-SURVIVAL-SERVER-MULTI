@@ -34,8 +34,10 @@ jobs:
           npx cap add android
           npx cap sync android
           M=android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application android:allowBackup="false" android:debuggable="false"/' $M
-          sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' $M
+          # allowBackup уже есть в шаблоне манифеста — заменяем значение, а не добавляем дубль атрибута
+          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' $M
+          grep -q 'android:screenOrientation' $M || sed -i '0,/<activity/s//<activity android:screenOrientation="sensorLandscape"/' $M
+          cat $M
       - name: Сборка APK
         env:
           KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
