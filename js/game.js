@@ -6780,9 +6780,6 @@ window.OSIL_NET = (function(){
     $('pm-exit').addEventListener('click', disconnect);
     harvestables.forEach((h,i) => { h.nid = i; });
     mServers.length = 0; mServers.push({name:'Локальная игра', sub:'Одиночная · без сети', cur:0, max:1, ping:0, solo:true}); mSelServer = 0; renderMenuServers();
-    if(window.__SERVER){   // APK: регистрация/вход на сервере сразу при запуске, закрыть нельзя
-      try{ const u = new URL(window.__SERVER); showAuth({host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80)), name:'ANODE'}, null, () => { refresh(); }, true); }catch(e){}
-    }
     refresh(); setInterval(() => { const ss = $('start-screen'); if(ss && ss.style.display !== 'none' && !document.hidden) refresh(); }, 15000);
     setInterval(() => {                                       // отправка своего состояния 10 раз/с
       if(!on) return;

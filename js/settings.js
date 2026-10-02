@@ -4,15 +4,16 @@ window.OSIL_SETTINGS=(function(){
   const KEY='osil_settings_v1';
   const DEF={
     sens:10, invertY:false, joySize:100, btnSize:100,
-    res:100, lighting:0, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:2, dist:190, fov:72, bob:100, water:true,
+    res:100, lighting:1, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:3, dist:200, fov:75, bob:100, water:true,
     volMaster:10, volSfx:10, volMusic:10, volSteps:10,
-    hudOn:true, fps:true, fpsCap:1, shadowDist:60, minimap:true, miniSize:100, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0
+    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:true, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0
   };
   const all=Object.assign({},DEF);
   try{ if(!localStorage.getItem('osil_res_fix')){ localStorage.setItem('osil_res_fix','1'); } }catch(e){}
   try{ const s=JSON.parse(localStorage.getItem(KEY)||'{}'); for(const k in DEF) if(k in s && typeof s[k]===typeof DEF[k]) all[k]=s[k]; if(!localStorage.getItem('osil_light_fix')){ all.lighting=0; localStorage.setItem('osil_light_fix','1'); } if(!localStorage.getItem('osil_res_fix2')){ all.res=100; localStorage.setItem('osil_res_fix2','1'); } }catch(e){}
   try{ if(all.dist>200){ all.dist=200; localStorage.setItem(KEY,JSON.stringify(all)); } }catch(e){}
   try{ if(!localStorage.getItem('osil_sens10')){ all.sens=10; localStorage.setItem('osil_sens10','1'); localStorage.setItem(KEY,JSON.stringify(all)); } }catch(e){}
+  try{ if(!localStorage.getItem('osil_defaults_v3')){ Object.assign(all,{res:100,lighting:1,shadowFilter:1,texQ:4,aniso:4,waterQ:1,shadows:3,dist:200,shadowDist:120,fov:75,miniSize:70}); localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_defaults_v3','1'); } }catch(e){}
   const subs=[];
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(all)); }catch(e){} }
   function emit(k){ subs.forEach(f=>{ try{ f(k,all[k],all); }catch(e){ console.error(e); } }); }
@@ -105,7 +106,7 @@ window.OSIL_SETTINGS=(function(){
           b.addEventListener('click',()=>{ OSIL_ADMIN.setTime(o[1]); }); w.appendChild(b); });
         ctl.appendChild(w);
       } else if(r.t==='preset'){
-        const PR=[{res:60,shadows:1,shadowDist:40,dist:90},{res:80,shadows:2,shadowDist:60,dist:140},{res:100,shadows:2,shadowDist:80,dist:190},{res:100,shadows:2,shadowDist:90,dist:190}];
+        const PR=[{res:60,shadows:1,shadowDist:40,dist:90},{res:80,shadows:2,shadowDist:60,dist:140},{res:100,shadows:2,shadowDist:80,dist:190},{res:100,shadows:3,shadowDist:120,dist:200,lighting:1,shadowFilter:1,texQ:4,aniso:4,waterQ:1}];
         const w=document.createElement('div'); w.className='set-seg';
         const cur=()=>PR.findIndex(p=>Object.keys(p).every(k=>all[k]===p[k]));
         ['Низкое','Среднее','Высокое','Ультра'].forEach((o,i)=>{ const b=document.createElement('button'); b.textContent=o; b.className=(cur()===i?'on':'');
