@@ -330,7 +330,7 @@ window.OSIL_TOOLS = (function(){
   }
   const _q1 = new T.Quaternion(), _q2 = new T.Quaternion(), _m4 = new T.Matrix4();
   /* дуга-складка кожи вокруг пальца, центр дуги смотрит по n */
-  function crease(p, tg, n, rad, arc, parent){
+  function crease(p, tg, n, rad, arc, parent){ return;   // линии-складки на пальцах убраны
     const m = new T.Mesh(new T.TorusGeometry(rad, 0.00085, 5, 10, arc), M.crease);
     _q1.setFromUnitVectors(_z, tg);
     const c = new T.Vector3(Math.cos(arc/2), Math.sin(arc/2), 0).applyQuaternion(_q1);
@@ -438,12 +438,12 @@ window.OSIL_TOOLS = (function(){
     const t = performance.now()/1000, sl = ud.slide||0, sq = ud.squeeze||0, sh = ud.shoulderShift;
     const hs = ud.gun ? null : ud.hands;
     if(hs){
-      hs[1].position.y = -0.024*sl + 0.0012*Math.sin(t*0.55);          // ведущая рука съезжает при ударе
-      hs[0].position.y =  0.004*sl + 0.0010*Math.sin(t*0.47+1.3);
-      hs[1].rotation.y = -0.035*sl + 0.012*Math.sin(t*0.41+0.7);       // проворот кисти на рукояти
-      hs[0].rotation.y =  0.050*sl + 0.010*Math.sin(t*0.36);
+      if(hs[1]) hs[1].position.y = (ud.hOff1||0) - 0.024*sl + 0.0012*Math.sin(t*0.55);          // ведущая рука съезжает при ударе
+      hs[0].position.y = (ud.hOff0||0) + 0.004*sl + 0.0010*Math.sin(t*0.47+1.3);
+      if(hs[1]) hs[1].rotation.y = (ud.hRot1||0) - 0.035*sl + 0.012*Math.sin(t*0.41+0.7);       // проворот кисти на рукояти
+      hs[0].rotation.y = (ud.hRot0||0) + 0.050*sl + 0.010*Math.sin(t*0.36);
       const k = 1 - 0.035*sq;                                          // сжатие хвата
-      hs[0].scale.set(k,1,k); hs[1].scale.set(k,1,k);
+      hs[0].scale.set(k,1,k); if(hs[1]) hs[1].scale.set(k,1,k);
     }
     tool.updateMatrix();
     for(const a of ud.arms){
@@ -879,6 +879,305 @@ window.OSIL_TOOLS = (function(){
     return g;
   }
 
+  /* ================= ПИСТОЛЕТ-ПУЛЕМЁТ (компактный ресивер, кожух ствола с дульным тормозом, передняя рукоять, магазин перед спуском, складной приклад) ================= */
+  function makeSMG(withHands){
+    const g = new T.Group(); g.userData.gun = true;
+    const add = m=>{ g.add(m); return m; };
+    const box = (w,h,d,mat,x,y,u)=>{ const m = new T.Mesh(new T.BoxGeometry(w,h,d), mat); m.position.set(x,y,-u); return add(m); };
+    const cyl = (r0,r1,len,mat,x,y,u,seg)=>{ const m = new T.Mesh(new T.CylinderGeometry(r0,r1,len,seg||20), mat); m.rotation.x = PI/2; m.position.set(x,y,-u); return add(m); };
+    const P = (pts,w,mat,b)=>add(prof(pts,w,mat,b));
+    const white = new T.MeshBasicMaterial({color:0xe8e8e4});
+    const BY = 0.040;
+    /* ресивер + верхний рельс + нижняя рамка */
+    P([[-0.090,0.000],[-0.090,0.066],[-0.078,0.070],[0.150,0.070],[0.150,0.000]], 0.046, G.gunSl, 0.004);
+    box(0.020,0.006,0.190,G.gunSlB,0,0.073,0.030);
+    P([[-0.085,0.002],[0.120,0.002],[0.120,-0.024],[-0.085,-0.024]], 0.040, G.gunFr, 0.003);
+    for(let i=0;i<4;i++) for(const sx of [-1,1]) box(0.0010,0.030,0.0035,G.black, sx*0.0232,0.040,-0.072+i*0.010);   // насечки затвора
+    box(0.0010,0.014,0.040,G.black,0.0232,0.056,0.070);                                                           // окно выброса
+    /* кожух ствола с прорезями, ствол и дульный тормоз */
+    cyl(0.0225,0.0225,0.130,G.gunFr,0,BY,0.215,24);
+    for(let i=0;i<4;i++) cyl(0.0236,0.0236,0.006,G.gunSlB,0,BY,0.180+i*0.022,24);
+    cyl(0.0088,0.0088,0.070,G.gunFrB,0,BY,0.310,18);
+    cyl(0.0140,0.0140,0.030,G.gunSlB,0,BY,0.338,20); cyl(0.0058,0.0058,0.004,G.black,0,BY,0.3545,14);
+    for(let i=0;i<3;i++) box(0.0300,0.0022,0.0040,G.black,0,BY+0.0135,0.330+i*0.008);
+    /* прицел: целик с белыми точками и мушка */
+    box(0.0040,0.014,0.008,G.black,-0.0085,0.081,-0.060); box(0.0040,0.014,0.008,G.black,0.0085,0.081,-0.060);
+    box(0.0015,0.004,0.0015,white,-0.0085,0.089,-0.060); box(0.0015,0.004,0.0015,white,0.0085,0.089,-0.060);
+    box(0.0050,0.020,0.008,G.black,0,0.072,0.270); box(0.0015,0.0015,0.0015,white,0,0.0825,0.270);
+    /* спусковая скоба + спуск */
+    { const cv = new T.CatmullRomCurve3([new T.Vector3(0,-0.024,0.055), new T.Vector3(0,-0.046,0.045), new T.Vector3(0,-0.050,-0.005), new T.Vector3(0,-0.032,-0.030), new T.Vector3(0,-0.024,-0.032)]);
+      add(new T.Mesh(new T.TubeGeometry(cv, 18, 0.0038, 8), G.gunFrB)); }
+    box(0.006,0.022,0.006,G.black,0,-0.034,-0.002).rotation.x = 0.25;
+    /* пистолетная рукоять (наклон назад, рёбра) */
+    { const gr = box(0.034,0.110,0.042,G.gunGrip,0,-0.073,-0.099); gr.rotation.x = -0.26;
+      for(let i=0;i<5;i++){ const t = 0.10+i*0.19, y = -0.020-t*0.110*Math.cos(0.26), u = -0.085 - t*0.110*Math.sin(0.26); const r = box(0.0350,0.008,0.044,G.gunGripDk,0,y,u); r.rotation.x = -0.26 + (i%2?0.25:-0.25); }
+      box(0.036,0.008,0.046,G.gunFrB,0,-0.128,-0.113).rotation.x = -0.26; }
+    /* передняя рукоять под кожухом */
+    box(0.026,0.072,0.030,G.gunGrip,0,-0.020,0.185);
+    for(let i=0;i<3;i++) box(0.0275,0.006,0.032,G.gunGripDk,0,-0.002-i*0.020,0.185);
+    /* складной приклад: две штанги и затылок */
+    const rod = (x0,y0,u0,x1,y1,u1,r)=> add(tubeBetween(x0,y0,-u0,x1,y1,-u1,r,G.gunSlB,8));
+    for(const sx of [-1,1]) rod(sx*0.016,0.044,-0.090, sx*0.016,0.034,-0.245, 0.0042);
+    box(0.040,0.090,0.012,G.gunGrip,0,0.000,-0.250); box(0.042,0.008,0.014,G.gunGripDk,0,0.042,-0.250);
+    g.userData.sightCenter = new T.Vector3(0,0.090,0.050);
+    bake(g);
+    /* магазин: изогнутая вперёд коробка (выезжает при перезарядке) */
+    const mag = new T.Group(); mag.position.set(0,0,0);
+    const mb = new T.Mesh(new T.BoxGeometry(0.028,0.132,0.040), G.gunSlB); mb.position.set(0,-0.088,-0.066); mb.rotation.x = 0.20; mag.add(mb);
+    for(let i=0;i<4;i++){ const r = new T.Mesh(new T.BoxGeometry(0.0295,0.006,0.042), G.gunFrB); r.position.set(0,-0.045-i*0.028,-0.058-i*0.011); r.rotation.x = 0.20; mag.add(r); }
+    const mp = new T.Mesh(new T.BoxGeometry(0.031,0.008,0.044), G.gunFr); mp.position.set(0,-0.154,-0.0955); mp.rotation.x = 0.20; mag.add(mp);
+    g.add(mag); g.userData.mag = mag;
+    const fl = new T.Group(); fl.position.set(0,BY,-0.375);
+    for(let i=0;i<2;i++){ const q = new T.Mesh(new T.PlaneGeometry(0.13,0.13), G.flash); q.rotation.z = i*PI/4; fl.add(q); }
+    fl.visible = false; g.add(fl); g.userData.flash = fl;
+    if(withHands){
+      const hR = makeHand(1, 0.072), hL = makeHand(-1, 0.072), V = T.Vector3;
+      const tilt = -0.26, axR = new V(0, Math.cos(tilt), Math.sin(tilt));
+      hR.quaternion.setFromAxisAngle(new V(1,0,0), tilt).multiply(new T.Quaternion().setFromAxisAngle(new V(0,1,0), -0.55));
+      hR.position.set(0,-0.073,0.099).addScaledVector(axR, -0.103);
+      hL.quaternion.setFromAxisAngle(new V(0,1,0), 0.55);                      // левая ладонь обхватывает переднюю рукоять
+      hL.position.set(0,-0.020,-0.185).addScaledVector(new V(0,1,0), -0.103);
+      g.add(hR); g.add(hL);
+      const aR = makeArm(1), aL = makeArm(-1);
+      aR.userData.wristLocal = hR.userData.wrist.clone(); aR.userData.hand = hR;
+      aL.userData.wristLocal = hL.userData.wrist.clone(); aL.userData.hand = hL;
+      aR.userData.camShoulder = new V( 0.30,-0.62, 0.02); aL.userData.camShoulder = new V(-0.34,-0.55,-0.02);
+      g.userData.arms = [aR, aL]; g.userData.hands = [hR, hL]; g.userData.slide = 0; g.userData.squeeze = 0; g.userData.shoulderShift = new V();
+    }
+    return g;
+  }
+
+  /* ================= РПГ (ракетница): труба с раструбом, прицел, две рукояти, ракета в стволе; обе руки на рукоятях ================= */
+  function makeRPG(withHands){
+    const g = new T.Group(), V = T.Vector3, PI2 = Math.PI/2;
+    const MS = (c,r,m)=> new T.MeshStandardMaterial({color:c, roughness:r, metalness:m});
+    const olive = MS(0x4d5340,0.55,0.55), dark = MS(0x24262a,0.5,0.75), steel = MS(0x6b6f74,0.4,0.8), wood = MS(0x6a4829,0.8,0.05), warm = MS(0x7a4a2c,0.55,0.5), rub = MS(0x1c1c1c,0.9,0.1);
+    const TY = 0.05;                                                   // ось трубы
+    const cyl = (rt,rb,len,mat,z,y,seg)=>{ const o = new T.Mesh(new T.CylinderGeometry(rt,rb,len,seg||24), mat); o.rotation.x = PI2; o.position.set(0,y===undefined?TY:y,z); g.add(o); return o; };
+    cyl(0.052,0.052,0.78,olive,-0.20);                                 // основная труба
+    cyl(0.062,0.062,0.14,dark,-0.55);                                  // передний хомут
+    cyl(0.064,0.064,0.12,dark,0.02);                                   // средний хомут
+    const tr = new T.Mesh(new T.CylinderGeometry(0.052,0.085,0.17,24,1,true), dark); tr.rotation.x = PI2; tr.position.set(0,TY,0.275); tr.material.side = T.DoubleSide; g.add(tr);   // задний раструб
+    cyl(0.088,0.088,0.012,steel,0.36);                                 // кромка раструба
+    [-0.34,-0.08].forEach(z=> cyl(0.0545,0.0545,0.02,steel,z));        // кольца
+    // ракета в стволе: боевая часть торчит спереди
+    const rk = new T.Group(); rk.position.set(0,TY,0);
+    const rb = new T.Mesh(new T.CylinderGeometry(0.043,0.043,0.14,18), warm); rb.rotation.x = PI2; rb.position.z = -0.455; rk.add(rb);
+    const rn = new T.Mesh(new T.ConeGeometry(0.044,0.15,18), steel); rn.rotation.x = -PI2; rn.position.z = -0.605; rk.add(rn);
+    const rt = new T.Mesh(new T.CylinderGeometry(0.0475,0.0475,0.04,18), dark); rt.rotation.x = PI2; rt.position.z = -0.54; rk.add(rt);
+    g.add(rk); g.userData.rocket = rk;
+    // прицел и мушка
+    const sBase = new T.Mesh(new T.BoxGeometry(0.03,0.026,0.2), dark); sBase.position.set(-0.058,TY+0.058,-0.12); g.add(sBase);
+    const sTube = new T.Mesh(new T.CylinderGeometry(0.014,0.014,0.17,12), dark); sTube.rotation.x = PI2; sTube.position.set(-0.058,TY+0.088,-0.12); g.add(sTube);
+    const sLens = new T.Mesh(new T.CircleGeometry(0.012,12), MS(0x3a7fb5,0.1,0.6)); sLens.position.set(-0.058,TY+0.088,-0.037); g.add(sLens);
+    const post = new T.Mesh(new T.BoxGeometry(0.008,0.04,0.008), dark); post.position.set(0,TY+0.07,-0.47); g.add(post);
+    // защита щёк: деревянные накладки под трубой
+    const shield = new T.Mesh(new T.BoxGeometry(0.095,0.03,0.42), wood); shield.position.set(0,TY-0.056,-0.11); g.add(shield);
+    // спусковая коробка
+    const box = new T.Mesh(new T.BoxGeometry(0.05,0.05,0.12), dark); box.position.set(0,TY-0.065,0.08); g.add(box);
+    const trig = new T.Mesh(new T.BoxGeometry(0.008,0.04,0.012), steel); trig.position.set(0,TY-0.1,0.045); trig.rotation.x = 0.3; g.add(trig);
+    const guard = new T.Mesh(new T.TorusGeometry(0.03,0.004,8,16,Math.PI), steel); guard.rotation.set(0,PI2,0); guard.position.set(0,TY-0.088,0.07); g.add(guard);
+    // рукояти (ось совпадает с хватом рук)
+    const tilt = -0.26, axR = new V(0, Math.cos(tilt), Math.sin(tilt));
+    const gripR = new T.Mesh(new T.CylinderGeometry(0.0235,0.026,0.15,16), rub); gripR.quaternion.setFromAxisAngle(new V(1,0,0), tilt);
+    const hRp = new V(0,-0.073,0.099).addScaledVector(axR,-0.103).add(new V(0,TY-0.03,0.0));
+    gripR.position.copy(hRp).addScaledVector(axR,0.10); g.add(gripR);
+    const hLp = new V(0,-0.020,-0.185).add(new V(0,-0.103,0)).add(new V(0,TY-0.03,0.0));
+    const gripL = new T.Mesh(new T.CylinderGeometry(0.0235,0.0235,0.15,16), rub); gripL.position.copy(hLp).add(new V(0,0.10,0)); g.add(gripL);
+    const fgm = new T.Mesh(new T.BoxGeometry(0.045,0.02,0.07), dark); fgm.position.set(0,TY-0.058,-0.185); g.add(fgm);
+    // --- детали: рёбра хомутов, передний раструб, планка, окуляр, плечевой упор, ремень, маркировка ---
+    const rib = MS(0x33362e,0.7,0.4), brass = MS(0xb08a3a,0.35,0.85), red = MS(0x9a2a22,0.6,0.3);
+    for(let i=0;i<5;i++) cyl(0.0575,0.0575,0.012,rib,-0.42+i*0.06,undefined,20);               // рёбра теплозащиты
+    const fcone = new T.Mesh(new T.CylinderGeometry(0.052,0.068,0.07,24,1,true), dark); fcone.rotation.x = PI2; fcone.position.set(0,TY,-0.60); fcone.material.side = T.DoubleSide; g.add(fcone);   // дульный раструб
+    cyl(0.07,0.07,0.01,steel,-0.635,undefined,24);
+    const rail = new T.Mesh(new T.BoxGeometry(0.018,0.01,0.34), dark); rail.position.set(0,TY+0.056,-0.12); g.add(rail);
+    for(let i=0;i<9;i++){ const nt = new T.Mesh(new T.BoxGeometry(0.022,0.004,0.008), steel); nt.position.set(0,TY+0.063,-0.27+i*0.04); g.add(nt); }
+    const eye = new T.Mesh(new T.CylinderGeometry(0.019,0.016,0.03,14), rub); eye.rotation.x = PI2; eye.position.set(-0.058,TY+0.088,-0.02); g.add(eye);        // резиновый окуляр
+    const obj = new T.Mesh(new T.CylinderGeometry(0.018,0.018,0.018,14), dark); obj.rotation.x = PI2; obj.position.set(-0.058,TY+0.088,-0.215); g.add(obj);    // объектив
+    const olens = new T.Mesh(new T.CircleGeometry(0.0145,14), MS(0x3a7fb5,0.08,0.7)); olens.rotation.y = Math.PI; olens.position.set(-0.058,TY+0.088,-0.2245); olens.rotation.y = 0; g.add(olens);
+    const pad = new T.Mesh(new T.BoxGeometry(0.07,0.07,0.03), rub); pad.position.set(0,TY-0.03,0.2); g.add(pad);                                          // упор
+    const knob = new T.Mesh(new T.CylinderGeometry(0.012,0.012,0.03,10), brass); knob.rotation.z = PI2; knob.position.set(0.066,TY+0.012,0.0); g.add(knob);     // взводная рукоять
+    [-0.46,0.12].forEach(z=>{ const ring = new T.Mesh(new T.TorusGeometry(0.014,0.0035,8,14), steel); ring.position.set(-0.062,TY-0.015,z); ring.rotation.y = PI2; g.add(ring); });   // антабки
+    const band = new T.Mesh(new T.CylinderGeometry(0.0535,0.0535,0.03,24), red); band.rotation.x = PI2; band.position.set(0,TY,-0.50); g.add(band);       // красная метка
+    const warn = new T.Mesh(new T.BoxGeometry(0.002,0.03,0.07), MS(0xe0c030,0.5,0.1)); warn.position.set(0.0525,TY,-0.20); g.add(warn);
+    // оперение ракеты (в стволе видна ступенька)
+    const fin = new T.Mesh(new T.CylinderGeometry(0.0475,0.0475,0.012,18), brass); fin.rotation.x = PI2; fin.position.set(0,0,-0.49); rk.add(fin);
+    // точка прицеливания для режима ADS (окуляр оптики)
+    g.userData.sightCenter = new V(-0.058,TY+0.088,-0.037);
+    const fl = new T.Group(); fl.position.set(0,TY,0.42);               // задний выхлоп
+    for(let i=0;i<2;i++){ const q = new T.Mesh(new T.PlaneGeometry(0.28,0.28), G.flash); q.rotation.z = i*PI/4; q.rotation.y = Math.PI; fl.add(q); }
+    fl.visible = false; g.add(fl); g.userData.flash = fl;
+    if(withHands){
+      const hR = makeHand(1, 0.072), hL = makeHand(-1, 0.072);
+      hR.quaternion.setFromAxisAngle(new V(1,0,0), tilt).multiply(new T.Quaternion().setFromAxisAngle(new V(0,1,0), -0.55));
+      hR.position.copy(hRp);
+      hL.quaternion.setFromAxisAngle(new V(0,1,0), 0.55);
+      hL.position.copy(hLp);
+      g.add(hR); g.add(hL);
+      const aR = makeArm(1), aL = makeArm(-1);
+      aR.userData.wristLocal = hR.userData.wrist.clone(); aR.userData.hand = hR;
+      aL.userData.wristLocal = hL.userData.wrist.clone(); aL.userData.hand = hL;
+      aR.userData.camShoulder = new V( 0.30,-0.62, 0.02); aL.userData.camShoulder = new V(-0.34,-0.55,-0.02);
+      g.userData.arms = [aR, aL]; g.userData.hands = [hR, hL]; g.userData.gun = true; g.userData.slide = 0; g.userData.squeeze = 0; g.userData.shoulderShift = new V();
+    }
+    return g;
+  }
+
+  /* ================= САТЧЕЛ-ЗАРЯД (по скриншоту: брезентовый ящик цвета хаки, коричневые ремни с пряжками, три медные банки с верёвочными петлями, деревянный вороток; в руках держится за боковые кожаные ручки двумя руками) ================= */
+
+  /* ---- Голографический прицел (EOTech-типа): камуфляжный корпус, два окна-рамки, крепление на планку, голограмма-сетка ---- */
+  function makeHoloSight(){
+    const g = new T.Group(); g.name = 'holo';
+    /* процедурный камуфляж: олива, коричневый, чёрный, охра + потёртости */
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d');
+    c.fillStyle = '#4b5a37'; c.fillRect(0,0,256,256);
+    let sd = 11; const rnd = ()=>{ sd = (sd*16807)%2147483647; return sd/2147483647; };
+    [['#36301f',26],['#1c1d19',18],['#7b6a44',16],['#3d4a2c',22]].forEach(p=>{
+      c.fillStyle = p[0];
+      for(let i=0;i<p[1];i++){ const x = rnd()*256, y = rnd()*256, r = 12+rnd()*26; c.beginPath();
+        c.ellipse(x,y,r*(0.8+rnd()*0.9),r*(0.5+rnd()*0.6),rnd()*3,0,6.283); c.fill(); }
+    });
+    c.fillStyle = 'rgba(200,190,150,.35)';
+    for(let i=0;i<70;i++){ c.fillRect(rnd()*256, rnd()*256, 1+rnd()*5, 1); }
+    c.fillStyle = 'rgba(10,10,8,.55)';
+    for(let i=0;i<50;i++){ c.fillRect(rnd()*256, rnd()*256, 1, 1+rnd()*4); }
+    const camoTex = new T.CanvasTexture(cv); camoTex.wrapS = camoTex.wrapT = T.RepeatWrapping; camoTex.anisotropy = 4;
+    const env = G.steelB ? G.steelB.envMap : null;
+    const camo = new T.MeshStandardMaterial({map:camoTex, roughness:0.62, metalness:0.22, envMap:env, envMapIntensity:0.55});
+    const blk  = new T.MeshStandardMaterial({color:0x17181a, roughness:0.48, metalness:0.65, envMap:env, envMapIntensity:0.8});
+    const blk2 = new T.MeshStandardMaterial({color:0x2a2b2d, roughness:0.4,  metalness:0.75, envMap:env, envMapIntensity:0.9});
+    const rub  = new T.MeshStandardMaterial({color:0x0d0d0e, roughness:0.95, metalness:0.0});
+    const glassM = new T.MeshStandardMaterial({color:0x6fa9b8, roughness:0.05, metalness:0.0, transparent:true, opacity:0.13, envMap:env, envMapIntensity:1.4, depthWrite:false, side:T.DoubleSide});
+    const add = (m,par)=>{ (par||g).add(m); return m; };
+    const box = (w,h,d,mat,x,y,z,par)=>{ const m = new T.Mesh(new T.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); return add(m,par); };
+    const cyl = (r,len,mat,x,y,z,axis,seg,par)=>{ const m = new T.Mesh(new T.CylinderGeometry(r,r,len,seg||14),mat); if(axis==='x') m.rotation.z = PI/2; else if(axis==='z') m.rotation.x = PI/2; m.position.set(x,y,z); return add(m,par); };
+    const rr = (sh,x,y,w,h,r)=>{ sh.moveTo(x+r,y); sh.lineTo(x+w-r,y); sh.quadraticCurveTo(x+w,y,x+w,y+r); sh.lineTo(x+w,y+h-r); sh.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+      sh.lineTo(x+r,y+h); sh.quadraticCurveTo(x,y+h,x,y+h-r); sh.lineTo(x,y+r); sh.quadraticCurveTo(x,y,x+r,y); };
+    const ring = (ow,oh,iw,ih,depth,mat,z,y)=>{
+      const sh = new T.Shape(); rr(sh,-ow/2,-oh/2,ow,oh,0.006);
+      const hole = new T.Path(); rr(hole,-iw/2,-ih/2,iw,ih,0.004); sh.holes.push(hole);
+      const geo = new T.ExtrudeGeometry(sh,{depth:depth-0.002, bevelEnabled:true, bevelThickness:0.001, bevelSize:0.001, bevelSegments:2, curveSegments:5});
+      geo.translate(0,0,-(depth-0.002)/2);
+      const m = new T.Mesh(geo,mat); m.position.set(0,y,z); return add(m);
+    };
+
+    /* --- крепление на планку Пикатинни: основание, зажимной рычаг, болты, поперечные упоры --- */
+    box(0.050,0.010,0.078,blk,0,0.005,0.0);
+    box(0.054,0.004,0.070,blk2,0,0.0105,0.0);
+    box(0.012,0.004,0.014,blk2,0,-0.002,-0.018); box(0.012,0.004,0.014,blk2,0,-0.002,0.018);       // упоры в паз планки
+    cyl(0.0042,0.012,blk2,0.030,0.008,0.008,'x',12);                                              // болт зажима
+    box(0.007,0.016,0.028,blk2,0.0355,0.010,0.008);                                               // рычаг зажима (рифлёный)
+    for(let i=0;i<5;i++) box(0.0075,0.017,0.0016,blk,0.0357,0.010,-0.002+i*0.0050);
+    cyl(0.0042,0.010,blk2,-0.029,0.008,0.008,'x',12);
+
+    /* --- корпус: нижний блок с уклоном вперёд (камуфляж) --- */
+    const body = prof2([[0.052,0.010],[0.052,0.018],[0.040,0.020],[-0.046,0.020],[-0.052,0.018],[-0.052,0.010]],0.046,camo);
+    add(body);
+    /* боковые стенки окон (цельные, как у оригинала) */
+    box(0.0045,0.046,0.084,camo,-0.0248,0.043,-0.002); box(0.0045,0.046,0.084,camo,0.0248,0.043,-0.002);
+    /* верхняя крышка с рёбрами и винтами */
+    box(0.050,0.0055,0.108,camo,0,0.0672,0.0);
+    box(0.050,0.003,0.030,blk,0,0.0704,0.030);   // козырёк-выступ сверху сзади
+    for(let i=0;i<4;i++) box(0.0345,0.0022,0.0035,blk,0,0.0705,-0.030+i*0.0075);
+    cyl(0.0032,0.003,blk2,-0.016,0.0708,0.038,'y',10); cyl(0.0032,0.003,blk2,0.016,0.0708,0.038,'y',10);
+
+    /* --- рамки окон: задняя (у глаза) выше и глубже, передняя короче --- */
+    ring(0.054,0.054,0.040,0.038,0.016,camo,0.048,0.0405);        // задняя
+    ring(0.056,0.056,0.042,0.040,0.0055,rub,0.0585,0.0405);       // резиновый наглазник
+    ring(0.052,0.050,0.040,0.038,0.012,camo,-0.048,0.0405);       // передняя
+    ring(0.054,0.052,0.042,0.040,0.004,blk,-0.0565,0.0405);       // кант вокруг переднего окна
+
+    /* --- стёкла с лёгким голубым отливом покрытия --- */
+    const gl1 = new T.Mesh(new T.PlaneGeometry(0.040,0.038), glassM); gl1.position.set(0,0.0405,0.0475); gl1.rotation.y = PI; add(gl1);
+    const gl2 = new T.Mesh(new T.PlaneGeometry(0.040,0.038), glassM); gl2.position.set(0,0.0405,-0.0475); add(gl2);
+
+    /* --- боковая электроника: крышка батареи, две кнопки, рифлёная шайба --- */
+    cyl(0.0088,0.006,blk2,0.0285,0.034,0.014,'x',18);
+    box(0.0016,0.0015,0.012,blk,0.0316,0.034,0.014);                                               // шлиц крышки
+    box(0.004,0.008,0.012,blk,-0.0268,0.040,0.004); box(0.004,0.008,0.012,blk,-0.0268,0.040,-0.012); // кнопки +/-
+    box(0.0016,0.011,0.016,blk2,-0.0262,0.029,0.010);                                              // лейбл-пластина
+
+    /* --- голограмма: кольцо, точка, 4 риски (красная, не пропадает за стеклом) --- */
+    const red = new T.MeshBasicMaterial({color:0xff2424, transparent:true, opacity:0.95, depthWrite:false, toneMapped:false, side:T.DoubleSide});
+    const ret = new T.Group(); ret.name = 'reticle'; ret.position.set(0,0.0405,0.0);
+    const rg = new T.Mesh(new T.RingGeometry(0.0108,0.0120,56), red); ret.add(rg);
+    const dot = new T.Mesh(new T.CircleGeometry(0.00085,14), red); ret.add(dot);
+    [[0,0.0135,0.0014,0.0030],[0,-0.0135,0.0014,0.0030],[0.0135,0,0.0030,0.0014],[-0.0135,0,0.0030,0.0014]].forEach(a=>{
+      const m = new T.Mesh(new T.PlaneGeometry(a[2],a[3]), red); m.position.set(a[0],a[1],0); ret.add(m); });
+    ret.renderOrder = 12; ret.traverse(o=>{ o.renderOrder = 12; });
+    add(ret);
+
+    g.traverse(o=>{ o.frustumCulled = false; });
+    g.userData.windowCenter = new T.Vector3(0,0.0405,0.0);   // центр окна/сетки в системе прицела
+    g.userData.length = 0.112;
+    return g;
+  }
+  /* профиль (u вперёд, y вверх) → экструзия по ширине */
+  function prof2(pts, w, mat){
+    const sh = new T.Shape(); sh.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) sh.lineTo(pts[i][0],pts[i][1]); sh.closePath();
+    const geo = new T.ExtrudeGeometry(sh,{depth:w-0.002, bevelEnabled:true, bevelThickness:0.001, bevelSize:0.001, bevelSegments:1, curveSegments:4});
+    geo.applyMatrix4(new T.Matrix4().set(0,0,1,-(w-0.002)/2, 0,1,0,0, -1,0,0,0, 0,0,0,1));
+    return new T.Mesh(geo, mat);
+  }
+  function makeSatchel(withHands){
+    const g = new T.Group(); g.userData.satchel = true;
+    if(!G.leather){
+      G.leather = new T.MeshStandardMaterial({color:0x4a2d1a, roughness:0.72, metalness:0.0});
+      G.woodS   = new T.MeshStandardMaterial({color:0xb48a55, roughness:0.82, metalness:0.0});
+      G.ropeBr  = new T.MeshStandardMaterial({color:0x7a5530, roughness:0.95, metalness:0.0});
+    }
+    const add = m=>{ g.add(m); return m; };
+    const box = (w,h,d,mat,x,y,z)=>{ const m = new T.Mesh(new T.BoxGeometry(w,h,d), mat); m.position.set(x,y,z); return add(m); };
+    const cylY = (r0,r1,h,mat,x,y,z,seg)=>{ const m = new T.Mesh(new T.CylinderGeometry(r0,r1,h,seg||20), mat); m.position.set(x,y,z); return add(m); };
+    /* корпус: тёмный низ + светлая крышка с кантом */
+    box(0.240,0.062,0.170,G.oliveDk,0,-0.035,0);
+    box(0.246,0.030,0.176,G.olive,0,0.011,0);
+    box(0.232,0.004,0.162,G.creamB,0,0.0275,0);
+    for(const sx of [-1,1]) box(0.004,0.026,0.168,G.leather,sx*0.121,0.011,0);          // боковые кантовые планки
+    box(0.244,0.026,0.004,G.leather,0,0.011,0.0875); box(0.244,0.026,0.004,G.leather,0,0.011,-0.0875);
+    /* ремни: по крышке и вниз по лицевой стороне, пряжки */
+    for(const x of [-0.060,0.060]){
+      box(0.024,0.0046,0.176,G.leather,x,0.0305,0);
+      box(0.024,0.094,0.0046,G.leather,x,-0.010,0.0895);
+      box(0.020,0.016,0.008,G.bronze,x,-0.050,0.092);
+      box(0.014,0.010,0.010,G.gunFrB,x,-0.050,0.094);
+    }
+    box(0.244,0.010,0.004,G.leather,0,-0.052,0.0875);                                   // нижний пояс
+    /* деревянный вороток на лицевой стороне */
+    box(0.052,0.030,0.018,G.woodS,0,0.000,0.098);
+    for(const x of [-0.011,0.011]) box(0.008,0.072,0.012,G.woodS,x,-0.046,0.096);
+    /* три медные банки с обручами, крышками и верёвочными петлями */
+    const cans = [[-0.078,-0.012],[0.000,-0.034],[0.078,-0.008]];
+    cans.forEach((c,i)=>{
+      const x = c[0], z = c[1], y0 = 0.0295, h = 0.060;
+      cylY(0.0315,0.0325,h,G.bronze,x,y0+h/2,z,24);
+      for(const yy of [y0+0.004, y0+h-0.004]){ const t = new T.Mesh(new T.TorusGeometry(0.0325,0.0033,8,24), G.gunSlB); t.rotation.x = PI/2; t.position.set(x,yy,z); add(t); }
+      const t2 = new T.Mesh(new T.TorusGeometry(0.0325,0.0020,6,24), G.gunFrB); t2.rotation.x = PI/2; t2.position.set(x,y0+h*0.5,z); add(t2);
+      cylY(0.0275,0.0275,0.006,G.gunSl,x,y0+h+0.002,z,24);
+      cylY(0.0060,0.0060,0.010,G.gunFrB,x,y0+h+0.008,z,10);
+      const loop = new T.Mesh(new T.TorusGeometry(0.019,0.0034,6,14,PI), G.ropeBr); loop.position.set(x,y0+h+0.004,z); loop.rotation.set(0,i===1?PI/2:0.4,0); add(loop);
+    });
+    /* боковые кожаные ручки (за них держат две руки) */
+    for(const sx of [-1,1]){
+      const hx = sx*0.156;
+      cylY(0.0115,0.0115,0.090,G.leather,hx,0.000,0,14);
+      for(const yy of [-0.038,0.038]) box(0.046,0.012,0.030,G.leather,sx*0.138,yy,0);
+    }
+    bake(g);
+    g.userData.flashMats = null;
+    if(withHands){
+      const hR = makeHand(1, 0.072), hL = makeHand(-1, 0.072), V = T.Vector3;
+      hR.position.set( 0.156,-0.103,0.002); hL.position.set(-0.156,-0.103,0.002);
+      g.add(hR); g.add(hL);
+      const aR = makeArm(1), aL = makeArm(-1);
+      aR.userData.wristLocal = hR.userData.wrist.clone(); aR.userData.hand = hR;
+      aL.userData.wristLocal = hL.userData.wrist.clone(); aL.userData.hand = hL;
+      aR.userData.camShoulder = new V( 0.34,-0.60, 0.04); aL.userData.camShoulder = new V(-0.34,-0.60, 0.04);
+      g.userData.arms = [aR, aL]; g.userData.hands = [hR, hL]; g.userData.gun = true; g.userData.slide = 0; g.userData.squeeze = 0; g.userData.shoulderShift = new V();
+    }
+    return g;
+  }
+
   function makePickaxe(){
     const g = new T.Group(), len = 0.60;
     g.add(makeHandle(len));
@@ -956,5 +1255,5 @@ window.OSIL_TOOLS = (function(){
     return g;
   }
 
-  return { init, makeRifle, makePistol, makeBerdanka, makePickaxe, makeAxe, makeSpear, addHands, updateArms, materials:M };
+  return { init, makeHoloSight, makeRifle, makePistol, makeBerdanka, makeSMG, makeRPG, makeSatchel, makePickaxe, makeAxe, makeSpear, addHands, updateArms, materials:M };
 })();

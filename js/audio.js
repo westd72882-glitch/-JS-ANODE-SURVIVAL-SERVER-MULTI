@@ -2,7 +2,7 @@
    длинные (ambient, walk) играют через <audio> из blob-URL. */
 window.OSIL_AUDIO=(function(){
   const S='assets/sounds/';
-  const SFX=['chop','hit_tree','hit_stone','jump','inventory_open','open','close','build','empty','rust-door-denied','player_scream','ak'];
+  const SFX=['chop','hit_tree','hit_stone','jump','inventory_open','open','close','build','empty','rust-door-denied','player_scream','ak','headshot'];
   const LOOPS=['ambient','night','walk'];
   const AC=window.AudioContext||window.webkitAudioContext;
   let ctx=null, master=null; const buf={}, loops={};
@@ -45,5 +45,25 @@ window.OSIL_AUDIO=(function(){
     Object.keys(loops).forEach(k=>{ if(k!=='walk') loops[k].volume=Math.min(1,0.45*vol.music*vol.master); });
   }
   function setVolume(v){ setVolumes({master:v}); }
-  return {SFX,LOOPS,load,play,music,walk,unlock,setVolume,setVolumes};
+  /* синтезированные звуки сатчела: писк и взрыв (файлов нет, генерируем) */
+  function beep(o){   // короткий чистый электронный «пик»: синус 2.4 кГц + тихая гармоника, резкая атака, ~70 мс
+    o=o||{}; if(!ensure()) return; if(ctx.state==='suspended') ctx.resume();
+    const t=ctx.currentTime, v=(o.vol||0.6)*vol.sfx*vol.master*0.5, f=o.f||2400;
+    const g=ctx.createGain(); g.connect(master);
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(v,t+0.003); g.gain.setValueAtTime(v,t+0.055); g.gain.linearRampToValueAtTime(0.0001,t+0.075);
+    const a=ctx.createOscillator(); a.type='sine'; a.frequency.value=f; a.connect(g); a.start(t); a.stop(t+0.09);
+    const h=ctx.createOscillator(), hg=ctx.createGain(); h.type='sine'; h.frequency.value=f*2; hg.gain.value=0.18; h.connect(hg); hg.connect(g); h.start(t); h.stop(t+0.09);
+  }
+  function boom(o){
+    o=o||{}; if(!ensure()) return; if(ctx.state==='suspended') ctx.resume();
+    const t=ctx.currentTime, len=1.3, n=Math.floor(ctx.sampleRate*len), b=ctx.createBuffer(1,n,ctx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<n;i++){ const k=i/n; d[i]=(Math.random()*2-1)*Math.pow(1-k,2.2); }
+    const src=ctx.createBufferSource(); src.buffer=b;
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(3200,t); lp.frequency.exponentialRampToValueAtTime(120,t+len);
+    const g=ctx.createGain(), v=(o.vol||1)*vol.sfx*vol.master; g.gain.value=v;
+    src.connect(lp); lp.connect(g); g.connect(master); src.start(t);
+    const os=ctx.createOscillator(), og=ctx.createGain(); os.type='sine'; os.frequency.setValueAtTime(95,t); os.frequency.exponentialRampToValueAtTime(32,t+0.5);
+    og.gain.setValueAtTime(v*0.9,t); og.gain.exponentialRampToValueAtTime(0.0001,t+0.6); os.connect(og); og.connect(master); os.start(t); os.stop(t+0.65);
+  }
+  return {SFX,LOOPS,load,play,music,walk,unlock,setVolume,setVolumes,beep,boom};
 })();

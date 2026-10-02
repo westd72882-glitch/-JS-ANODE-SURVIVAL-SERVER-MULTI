@@ -27,7 +27,7 @@ root.WorldGen={mulberry32,makeNoise};
 })(typeof window!=='undefined'?window:globalThis);
 
 (function(root){
-const B={SEA:0,DEEP:1,BEACH:2,DESERT:3,PLAIN:4,FOREST:5,SNOW:6,LAKE:7,ROCK:8};
+const B={SEA:0,DEEP:1,BEACH:2,DESERT:3,PLAIN:4,FOREST:5,SNOW:6,LAKE:7,ROCK:8,ROAD:9};
 const SEA_LEVEL=0.0;
 /* Один остров (скруглённый квадрат с изрезанным берегом): запад — пустыня, центр — лес/равнина, восток — снег.
    h — высота В МЕТРАХ, море на 0. Берег и дно моря — сплошной пологий склон (~7–8%), без обрывов. */
@@ -35,16 +35,16 @@ function generate(seed,N,size){
   N=N||256; size=size||400;
   const nH=WorldGen.makeNoise(seed), nW=WorldGen.makeNoise(seed+101), nT=WorldGen.makeNoise(seed+202), nM=WorldGen.makeNoise(seed+303);
   const rp=WorldGen.mulberry32(seed+909), ponds=[];
-  for(let q=0;q<3;q++) ponds.push([0.32+rp()*0.36,0.3+rp()*0.4,0.03+rp()*0.015]);
+  for(let q=0;q<0;q++) ponds.push([0.32+rp()*0.36,0.3+rp()*0.4,0.03+rp()*0.015]);
   const h=new Float32Array(N*N), biome=new Uint8Array(N*N), lake=new Uint8Array(N*N);
   const sm=(a,b,t)=>{t=Math.max(0,Math.min(1,(t-a)/(b-a)));return t*t*(3-2*t)};
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){
     const k=j*N+i, x=i/(N-1), y=j/(N-1), dx=(x-.5)*2, dy=(y-.5)*2;
     const d=Math.pow(Math.pow(Math.abs(dx),4.5)+Math.pow(Math.abs(dy),4.5),1/4.5);
     const w=nW(x*3,y*3,4,2,.55)*.16+nW(x*9+7,y*9+7,3,2,.5)*.05;
-    const cm=(0.86+w-d)*size/2;                       // метры до берега: >0 суша, <0 море
+    const cm=(0.62+w-d)*size/2;                       // метры до берега: >0 суша, <0 море
     let e, isLake=false;
-    if(cm<0){ const t=-cm; e=Math.max(-32,-(t*0.08+t*t*0.0011)); }
+    if(cm<0){ const t=-cm; e=Math.max(-32,-(0.35+Math.min(t,200)*0.006+Math.pow(Math.max(0,t-200),2)*0.02)); }
     else{
       const ramp=Math.min(cm,14)*0.07, inl=sm(8,90,cm);
       // крупные холмы + средние бугры + мелкая неровность; на востоке (снег) — высокие горы
@@ -58,14 +58,34 @@ function generate(seed,N,size){
     let b;
     if(cm<0) b=e<-6?B.DEEP:B.SEA;
     else if(isLake) b=B.LAKE;
-    else if(cm<9) b=B.BEACH;
+    else if(cm<20+nT(x*7+3,y*7+3,3,2,.5)*9&&e<7) b=B.BEACH;
     else{
-      const des=0.2+0.18*Math.sin(Math.PI*Math.max(0,Math.min(1,(y-.04)/.9)))+nT(x*3,y*3,3,2,.5)*.05;
-      const sno=0.7+nT(x*4+9,y*4+9,3,2,.5)*.09;
-      if(x<des) b=B.DESERT; else if(x>sno) b=B.SNOW;
+      const des=0.35+0.08*Math.sin(Math.PI*Math.max(0,Math.min(1,(x-.04)/.9)))+nT(x*3,y*3,3,2,.5)*.04;
+      const sno=0.37+nT(x*4+9,y*4+9,3,2,.5)*.06;
+      if(y>1-des) b=B.DESERT; else if(y<sno) b=B.SNOW;
       else b=nM(x*3.5,y*3.5,4,2,.5)>-0.02?B.FOREST:B.PLAIN;
     }
     biome[k]=b;
+  }
+  /* Дорога: плавная синусоида с запада на восток через центр; вдоль неё рельеф сглажен и выровнен.
+     Заправка — на центральной площадке (x=0, z=-15 м). */
+  const rz=x=>0.5+0.04*Math.sin((x-.5)*7.5), X0=Math.round(0.22*(N-1)), X1=Math.round(0.78*(N-1));
+  const cellM=size/(N-1), HW=5.5, rc=new Float32Array(N), rs=new Float32Array(N);
+  for(let i=X0;i<=X1;i++){ const j=Math.round(rz(i/(N-1))*(N-1)); rc[i]=Math.max(1.0,h[j*N+i]); }
+  for(let i=X0;i<=X1;i++){ let s=0,c=0; for(let d=-16;d<=16;d++){const q=i+d; if(q>=X0&&q<=X1){s+=rc[q];c++;}} rs[i]=s/c; }
+  const mid=Math.round(0.5*(N-1)), padH=rs[mid], padJ=(0.5-15/size)*(N-1);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const k=j*N+i; if(biome[k]<B.BEACH||biome[k]===B.LAKE) continue;
+    let e=h[k];
+    if(i>=X0&&i<=X1){
+      const d=Math.abs(j-rz(i/(N-1))*(N-1))*cellM;
+      if(d<HW+9){ const t=d<=HW?1:1-sm(HW,HW+9,d); e=e*(1-t)+rs[i]*t; if(d<=HW&&e>0.3) biome[k]=B.ROAD; }
+    }
+    const pd=Math.hypot(i-mid,j-padJ)*cellM;
+    if(pd<30){ const t=pd<=18?1:1-sm(18,30,pd); e=e*(1-t)+padH*t; }
+    const qi=(0.5+78/size)*(N-1), qj=(0.5-74/size)*(N-1), qd=Math.hypot(i-qi,j-qj)*cellM;   // Агропром (снежный угол)
+    if(qd<40){ const t=qd<=27?1:1-sm(27,40,qd); e=e*(1-t)+3.5*t; if(qd<=33&&e>0.3) biome[k]=B.SNOW; }
+    h[k]=e;
   }
   return {N,seed,size,h,biome,lake};
 }

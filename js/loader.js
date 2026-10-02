@@ -22,13 +22,25 @@ window.OSIL_LOADER=(function(){
   function script(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src+(src.indexOf('?')<0?'?t='+Date.now():''); s.onload=res; s.onerror=()=>rej(src); document.body.appendChild(s); }); }
   function img(u){ return new Promise(r=>{ const i=new Image(); i.onload=i.onerror=()=>r(); i.src=u; }); }
 
+  /* При старте грузим только то, что видно в меню. Остальные текстуры/иконки/звуки — при входе в игру (enter) */
+  const MENU_IMGS=['1/menu-bg-update.webp','1/default-avatar.webp','1/coin.webp'];
+  let _gameAssets=false;
+  async function loadGameAssets(){
+    if(_gameAssets) return; _gameAssets=true;
+    const menu=new Set(MENU_IMGS);
+    const imgs=Array.from(new Set(Object.values(TEXTURES).concat(window.EXTRA_IMAGES||[]))).filter(u=>!menu.has(u));
+    const snds=OSIL_AUDIO.SFX.concat(OSIL_AUDIO.LOOPS.filter(n=>n!=='night'));
+    const total=imgs.length+snds.length; let done=0;
+    const tick=(stage,file)=>{ done++; set(0.05+0.9*done/total,stage,file); };
+    for(let i=0;i<imgs.length;i+=8){ await Promise.all(imgs.slice(i,i+8).map(u=>img(u).then(()=>tick('Загрузка текстур',u.split('/').pop())))); }
+    for(let i=0;i<snds.length;i+=4){ await Promise.all(snds.slice(i,i+4).map(n=>OSIL_AUDIO.load(n).then(()=>tick('Загрузка звуков',n+'.mp3')))); }
+  }
   async function boot(){
     show();
     if(typeof THREE==='undefined'){
       set(0,'Ошибка: не загружен Three.js','Проверьте интернет и обновите страницу'); return;
     }
-    const imgs=Array.from(new Set(Object.values(TEXTURES).concat(window.EXTRA_IMAGES||[])));
-    const snds=OSIL_AUDIO.SFX.concat(OSIL_AUDIO.LOOPS.filter(n=>n!=='night'));
+    const imgs=MENU_IMGS.slice(), snds=[];
     const W_SND=3, total=imgs.length+snds.length*W_SND+4; let done=0;
     const tick=(n,stage,file)=>{ done+=n; set(done/total,stage,file); };
     // 1) текстуры и иконки (параллельно пачками)
@@ -54,8 +66,8 @@ window.OSIL_LOADER=(function(){
   /* Экран входа на остров (вызывается по кнопке ИГРАТЬ) */
   async function enter(cb){
     show(); set(0,'Вход на остров','');
-    const st=[['Подготовка мира','рельеф'],['Расстановка ресурсов','деревья и руды'],['Настройка освещения','солнце и тени'],['Спавн игрока','']];
-    for(let i=0;i<st.length;i++){ set(i/st.length,st[i][0],st[i][1]); await wait(320); }
+    await loadGameAssets();
+    set(0.97,'Спавн игрока',''); await frame();
     set(1,'Добро пожаловать!',''); await frame();
     try{ cb&&cb(); }catch(e){}
     await wait(250); hide();
