@@ -1,0 +1,54 @@
+name: Build APK
+# Адрес сервера по умолчанию зашит ниже; можно переопределить переменной SERVER_URL (Settings → Variables)
+# Для подписи release: секреты KEYSTORE_BASE64 и KEYSTORE_PASSWORD (алиас ключа: anode). Без них соберётся debug-APK.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Сборка веб-части (обфускация, шифрование ресурсов и кода)
+        env:
+          SERVER_URL: ${{ vars.SERVER_URL || 'https://js-anode-survival-server-multi.onrender.com' }}
+        run: |
+          npm i --no-save three@0.128.0 javascript-obfuscator@4
+          mkdir -p ws/js && cp -r index.html css assets 1 ws/ && cp js/*.js ws/js/ && cp node_modules/three/build/three.min.js ws/
+          for f in ws/js/*.js; do
+            [ "$f" = "ws/js/register-sw.js" ] && continue
+            npx javascript-obfuscator "$f" --output "$f" --compact true --string-array true --string-array-encoding base64 --string-array-threshold 0.75 --identifier-names-generator hexadecimal
+          done
+          node tools/pack.js ws www
+          npx javascript-obfuscator www/b.js --output www/b.js --compact true --control-flow-flattening true --control-flow-flattening-threshold 0.6 --dead-code-injection true --dead-code-injection-threshold 0.3 --string-array true --string-array-encoding rc4 --string-array-threshold 1 --identifier-names-generator hexadecimal --split-strings true --split-strings-chunk-length 5
+          ls -la www
+      - name: Capacitor + Android
+        run: |
+          npm i --no-save @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "ANODE SURVIVAL" com.anode.survival --web-dir www
+          npx cap add android
+          npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:allowBackup="false" android:debuggable="false"/' $M
+          sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' $M
+      - name: Сборка APK
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          cd android
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > app/release.jks
+            ./gradlew assembleRelease -Pandroid.injected.signing.store.file=$PWD/app/release.jks -Pandroid.injected.signing.store.password=$KS_PASS -Pandroid.injected.signing.key.alias=anode -Pandroid.injected.signing.key.password=$KS_PASS
+          else
+            ./gradlew assembleDebug
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anode-apk
+          path: android/app/build/outputs/apk/**/*.apk
