@@ -2595,7 +2595,10 @@ try{ ADMIN_FREE = localStorage.getItem('osil_admin')==='1'; }catch(e){}
 function adminGrantRes(){ ['wood','stone','metal'].forEach(k=>addItem(k,1000)); }   // промокод Admin6737: +1000 дерева, камня, железа
 if(ADMIN_FREE) adminGrantRes();
 window.OSIL_ADMIN = { ok(){ return ADMIN_FREE && !(window.OSIL_NET && OSIL_NET.on); }, setTime(f){ gameClock = ((f%1)+1)%1*CYCLE_LEN; skyTimer = 99; }, getTime(){ return gameClock/CYCLE_LEN; } };
+const DONATE_ITEMS = ['copter','quarry'];
+function donLocked(id){ return DONATE_ITEMS.includes(id) && !(window.OSIL_ACC && OSIL_ACC.owns(id)); }
 function canCraft(r, qty){
+  if(donLocked(r.give && (r.give.item||r.give.tool))) return false;
   if(ADMIN_FREE) return true;
   if(!Object.keys(r.cost).every(k => countItem(k) >= r.cost[k]*qty)) return false;
   return true;
@@ -2618,6 +2621,7 @@ function craftItem(id, qty){
   qty = qty||1;
   const r = CRAFT_RECIPES.find(x=>x.id===id);
   if(!r) return;
+  if(donLocked(r.give && (r.give.item||r.give.tool))){ showToast('Донат-предмет: купите его во вкладке «Донат»'); return; }
   if(!canCraft(r, qty)){ showToast('Недостаточно ресурсов'); window.OSIL_AUDIO&&OSIL_AUDIO.play('rust-door-denied'); return; }
   const ex = craftQueue.find(q=>q.id===id);
   if(!ex && craftQueue.length >= CRAFT_Q_MAX){ showToast('Очередь: не больше '+CRAFT_Q_MAX+' разных предметов'); window.OSIL_AUDIO&&OSIL_AUDIO.play('rust-door-denied'); return; }
@@ -2743,7 +2747,7 @@ const cellKey = (cx,cz,l)=> Math.round(cx/CELL)+','+Math.round(cz/CELL)+','+l;
 const edgeKey = (x,z,l)=> Math.round(x*2/CELL)+','+Math.round(z*2/CELL)+','+l;
 
 function planInHand(){ const sl=hotbarSlots[selectedSlot]; return !!(sl && sl.k==='plan'); }
-function heldPlace(){ const sl=hotbarSlots[selectedSlot]; return (sl && PLACE_HELD[sl.k]) ? sl.k : null; }
+function heldPlace(){ const sl=hotbarSlots[selectedSlot]; if(sl && donLocked(sl.k)){ if(!heldPlace._t || performance.now()-heldPlace._t>3000){ heldPlace._t=performance.now(); showToast('Донат-предмет не куплен'); } return null; } return (sl && PLACE_HELD[sl.k]) ? sl.k : null; }
 function syncBuildMode(){
   const held = heldPlace();
   const on = (planInHand() || !!held) && !panelsOpen();
@@ -4770,6 +4774,8 @@ document.getElementById('close-craft').addEventListener('click', guardedClose(to
 /* ---------------- Пауза ---------------- */
 let gamePaused = false;
 function setPause(on){
+  const mp = !!(window.OSIL_NET && OSIL_NET.on);
+  if(mp){ document.getElementById('pause-menu').classList.toggle('hidden', !on); if(on){ closeWorldPanels(); attackHeld=false; for(const k in keys) keys[k]=false; } updateFpsVisibility(); syncPointerLock(); return; }   // сетевая игра: мир не замирает
   if(on === gamePaused) return;
   gamePaused = on;
   document.getElementById('pause-menu').classList.toggle('hidden', !on);
@@ -4859,7 +4865,7 @@ function endLayout(){
 }
 /* раскладка «как на фото»: центры элементов в долях экрана 960×449 */
 const PHOTO_LAYOUT = {'btn-pause':[692,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],'btn-run':[771,222],'btn-jump':[802,329],'btn-crouch':[876,396],
-  'hud-bars':[108,47],'hotbar':[480,413],'fps-counter':[232,14],'btn-hit':[722,329],'btn-aim':[640,300],'btn-reload':[640,230],'ammo-hud':[737,419]};
+  'hud-bars':[108,47],'hotbar':[480,413],'fps-counter':[232,14],'minimap':[262,74],'btn-hit':[722,329],'btn-aim':[640,300],'btn-reload':[640,230],'ammo-hud':[737,419]};
 function applyPhotoLayout(){
   const W = window.innerWidth, H = window.innerHeight; layoutData = {};
   const hadGun = document.body.classList.contains('has-gun'); document.body.classList.add('has-gun');
@@ -6012,6 +6018,7 @@ function updateCopterGhost(){
   copterGhost.traverse(o=>{ if(o.isMesh) (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.color) m.color.set(col); if(m.emissive) m.emissive.set(0); }); });
 }
 function placeCopter(){
+  if(donLocked('copter')){ showToast('Миникоптер — донат-предмет: купите его во вкладке «Донат»'); return; }
   if(copter.exists){ showToast('Ваш коптер уже стоит в мире. Разбейте его, чтобы поставить новый'); return; }
   const d=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw)), x=player.pos.x+d.x*6, z=player.pos.z+d.z*6;
   if(isWaterAt(x,z)){ showToast('Нельзя поставить на воду'); return; }
@@ -6313,6 +6320,8 @@ document.querySelectorAll('.m-tab').forEach(tab=>{
     document.getElementById('m-paneServers').classList.toggle('hidden', which!=='servers');
     document.getElementById('m-paneTop').classList.toggle('hidden', which!=='top');
     document.getElementById('m-panePromo').classList.toggle('hidden', which!=='promo');
+    document.getElementById('m-paneDonate').classList.toggle('hidden', which!=='donate');
+    if(which==='donate'||which==='promo'){ OSIL_ACC.refresh().then(renderDonate); renderDonate(); }
     if(which==='top') renderMenuTop();
   });
 });
@@ -6346,7 +6355,7 @@ document.getElementById('m-promoBtn').addEventListener('click', ()=>{
     OSIL_ACC.call('/api/promo', {code}).then(d=>{
       if(d.error){ msg.textContent=d.error; msg.style.color='#d08080'; return; }
       OSIL_ACC.me = d; mCoins = d.coins; document.getElementById('m-pCoins').textContent = d.coins; document.getElementById('m-pLvl').textContent = d.level;
-      msg.textContent = d.msg; msg.style.color = '#bcd096';
+      msg.textContent = d.msg; msg.style.color = '#bcd096'; renderDonate();
     });
     return;
   }
@@ -6695,10 +6704,27 @@ window.OSIL_NET = (function(){
     me:null,
     sess(){ const s = curSrv || mServers[mSelServer]; if(!s || s.solo) return null; const a = authAll()[authKey(s)]; return a ? {url:baseUrl(s), tok:a.t} : null; },
     async call(path, body){ const c = this.sess(); if(!c) return {error:'Нет входа на сервер'};
-      try{ const r = await fetch(c.url+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({token:c.tok}, body||{}))}); return await r.json(); }
-      catch(e){ return {error:'Сервер недоступен'}; } },
+      let r; try{ r = await fetch(c.url+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({token:c.tok}, body||{}))}); }
+      catch(e){ return {error:'Сервер недоступен ('+c.url+')'}; }
+      try{ return await r.json(); }catch(e){ return {error: r.status===404 ? 'Сервер не обновлён: загрузите новый server.py и перезапустите' : 'Ошибка ответа сервера ('+r.status+')'}; } },
     async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; } return d; },
-    isAdmin(){ return !!(this.me && this.me.admin); }
+    isAdmin(){ return !!(this.me && this.me.admin); },
+    owns(id){ return !!(ADMIN_FREE || (this.me && (this.me.admin || (this.me.items||[]).includes(id)))); }
+  };
+  setInterval(()=>{ if(OSIL_ACC.sess()) OSIL_ACC.refresh().then(()=>{ const p=document.getElementById('m-paneDonate'); if(p && !p.classList.contains('hidden')) renderDonate(); }); }, 6000);
+  const DON = {copter:{n:'Миникоптер', d:'Личный вертолёт: после покупки можно крафтить и ставить', icon:'1/copter.webp'}, quarry:{n:'Карьер', d:'Сам добывает камень, железо и серу: можно крафтить и ставить', icon:'1/quarry.webp'}};
+  window.renderDonate = function(){
+    const el = document.getElementById('m-donate'); if(!el) return; const me = OSIL_ACC.me, ok = !!OSIL_ACC.sess();
+    let h = '<div class="m-qhead">ДОНАТ</div><div style="margin:6px 0;color:#ddd">Монеты: <b style="color:#e8b82a">'+(me?me.coins:mCoins)+'</b>'+(ok?'':' · войдите на сервер, чтобы покупать')+'</div>';
+    Object.keys(DON).forEach(k=>{ const price = (me&&me.shop&&me.shop[k]) || (k==='copter'?420:1200), have = OSIL_ACC.owns(k);
+      h += '<div class="dn-card"><img src="'+DON[k].icon+'" alt=""><div class="dn-i"><b>'+DON[k].n+'</b>'+DON[k].d+'</div><button data-k="'+k+'" '+(have?'disabled':'')+'>'+(have?'КУПЛЕНО':price+' мон.')+'</button></div>'; });
+    h += '<button class="m-btn gold" id="dn-get" style="width:100%;margin-top:10px">ПОЛУЧИТЬ ДОНАТ</button><div id="dn-msg" style="margin-top:8px"></div>';
+    el.innerHTML = h;
+    el.querySelectorAll('.dn-card button').forEach(b=>b.addEventListener('click', async()=>{
+      const d = await OSIL_ACC.call('/api/shop', {item:b.dataset.k}), m = document.getElementById('dn-msg');
+      if(d.u){ OSIL_ACC.me = d; mCoins = d.coins; document.getElementById('m-pCoins').textContent = d.coins; }
+      renderDonate(); const m2 = document.getElementById('dn-msg'); m2.textContent = d.error || d.msg; m2.style.color = d.error ? '#d08080' : '#bcd096'; }));
+    document.getElementById('dn-get').addEventListener('click', ()=>window.open('https://t.me/AnodeStudioOxide','_blank'));
   };
   const lastUser = () => { try{ return localStorage.getItem('anode_lastuser') || ''; }catch(e){ return ''; } };
   const hostPort = s => (s.port==443||s.port==80||!s.port) ? s.host : s.host + ':' + s.port;
@@ -6787,7 +6813,7 @@ window.OSIL_NET = (function(){
     res.forEach(c => { const key = c.ok ? c.name + '|' + c.port : c.host + ':' + c.port; if(seen.has(key)) return; seen.add(key); rows.push(c); });
     mServers.length = 0;
     mServers.push({name:'Локальная игра', sub:'Одиночная · без сети', cur:0, max:1, ping:0, solo:true});
-    rows.forEach(c => mServers.push({name: c.ok ? c.name : (c.name || c.host + ':' + c.port), sub: c.host + ':' + c.port + ' · ' + (c.ok ? c.src : 'нет ответа'),
+    rows.forEach(c => mServers.push({name: c.ok ? (/^(localhost|127\.|192\.168\.|10\.)/.test(c.host) && !c.name ? 'server anode 1' : c.name) : 'server anode 1', sub: c.ok ? 'Онлайн' : 'нет ответа',
       cur: c.ok ? c.cur : 0, max: c.ok ? c.max : 0, ping: c.ok ? c.ping : '—', host: c.host, port: c.port, off: !c.ok}));
     if(window.__SERVER && !refresh._sel && mServers.length > 1){ mSelServer = 1; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
     if(mSelServer >= mServers.length) mSelServer = 0;
