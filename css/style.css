@@ -812,3 +812,6 @@ body.hud-off #hud-bars, body.hud-off #hotbar, body.hud-off #minimap, body.hud-of
 .sh-bar{ flex-wrap:wrap; }
 .sh-info{ flex:1 1 180px; min-width:0; font-size:clamp(11px,2.8vh,13px); }
 #dn-get{ flex:0 1 auto; max-width:100%; padding:6px 12px; font-size:clamp(12px,3.4vh,16px); white-space:normal; text-align:center; } #dn-get small{ font-size:.85em; }
+
+#net-chat-x{ position:fixed; left:min(calc(8px + 60vw + 6px),372px); bottom:90px; z-index:70; width:34px; height:34px; border:none; background:rgba(120,30,30,.85); color:#fff; font-size:16px; }
+body.ui-open #net-chat-x{ display:none !important; }
