@@ -223,7 +223,7 @@ DB.executescript('''CREATE TABLE IF NOT EXISTS wallet(u TEXT PRIMARY KEY, coins 
 DB.executescript('''CREATE TABLE IF NOT EXISTS donations(u TEXT, item TEXT, PRIMARY KEY(u,item));
 CREATE TABLE IF NOT EXISTS xp(u TEXT PRIMARY KEY, v INTEGER);
 CREATE TABLE IF NOT EXISTS promocodes(code TEXT PRIMARY KEY, coins INTEGER, item TEXT, uses INTEGER, used INTEGER);''')
-SHOP = {'copter': 420, 'quarry': 1200}; SHOPL = threading.Lock()
+SHOP = {'copter': 420, 'quarry': 1200, 'eod_suit': 350}; SHOPL = threading.Lock()
 def owned(u): return sorted(r[0] for r in qa('SELECT item FROM donations WHERE u=?', (u,)))   # админы тоже получают предметы только через покупку/выдачу
 def owns(u, item): return item in owned(u)
 def add_xp(u, n):
@@ -616,6 +616,13 @@ def handle_msg(cl, m):
     if t == 'st':
         s = m.get('s')
         if isinstance(s, list) and len(s) == 7: cl.st = s
+    elif t == 'bs':                         # снимок кабанов: принимаем только от хоста (клиент с наименьшим id)
+        with LOCK: host = min((c.id for c in clients.values() if c.id), default=None)
+        if cl.id == host and isinstance(m.get('b'), list) and len(m['b']) < 400: broadcast({'t': 'bs', 'b': m['b']}, skip=cl)
+    elif t == 'zd':                         # урон кабану от не-хоста: пересылаем всем (применит хост)
+        if isinstance(m.get('i'), int) and isinstance(m.get('d'), (int, float)): broadcast({'t': 'zd', 'i': m['i'], 'd': min(200, max(0, m['d']))}, skip=cl)
+    elif t == 'cs':                         # состояние коптера игрока: рассылаем остальным
+        if isinstance(m.get('x'), (int, float)): broadcast({**{k: m.get(k) for k in ('e', 'x', 'y', 'z', 'r', 'q', 'w', 'p')}, 't': 'cs', 'id': cl.id}, skip=cl)
     elif t == 'hr':                         # добыча ресурса: урон по узлу, количество и лут считает сервер
         i, ty, tool = m.get('i'), m.get('ty'), m.get('k'); now = time.time()
         if not (isinstance(i, int) and 0 <= i < 200000 and ty in NODES) or now - getattr(cl, 'last_hr', 0) < 0.3: return
