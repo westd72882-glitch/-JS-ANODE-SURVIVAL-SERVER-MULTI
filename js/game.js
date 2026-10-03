@@ -542,8 +542,8 @@ function isDepNode(t){ return t.type==='wood'||t.type==='stone'||t.type==='sulfu
 /* сколько списать с узла за удар: 3–5, остаток (всего 50) всегда делится без хвоста */
 function nodeTake(t){
   const L = Math.round(t.health); if(L<=5) return Math.max(1,L);
-  const lo = Math.max(3,L-5), hi = Math.min(5,L-3);
-  return lo + Math.floor(Math.random()*(hi-lo+1));
+  const ok = [3,4,5].filter(t=>L-t>=3);
+  return ok[Math.floor(Math.random()*ok.length)];
 }
 function updateFalling(dt){
   for(let i=fallingNodes.length-1;i>=0;i--){
@@ -2615,7 +2615,7 @@ function adminFree(){ return ADMIN_FREE || !!(window.OSIL_ACC && OSIL_ACC.isAdmi
 if(ADMIN_FREE) adminGrantRes();
 window.OSIL_ADMIN = { ok(){ return ADMIN_FREE && !(window.OSIL_NET && OSIL_NET.on); }, setTime(f){ gameClock = ((f%1)+1)%1*CYCLE_LEN; skyTimer = 99; }, getTime(){ return gameClock/CYCLE_LEN; } };
 const DONATE_ITEMS = ['copter','quarry','eod_suit'];
-function donLocked(id){ return DONATE_ITEMS.includes(id) && !(window.OSIL_ACC && OSIL_ACC.owns(id)); }
+function donLocked(id){ if(!(window.OSIL_NET && OSIL_NET.on)) return false; return DONATE_ITEMS.includes(id) && !(window.OSIL_ACC && OSIL_ACC.owns(id)); }   // в одиночной игре донат-предметы доступны
 function canCraft(r, qty){
   if(donLocked(r.give && (r.give.item||r.give.tool))) return false;
   if(adminFree()) return true;
@@ -6858,15 +6858,14 @@ window.OSIL_NET = (function(){
     const cand = new Map(), add = (host, port, src, name) => { const k = norm(host) + ':' + port; if(!cand.has(k)) cand.set(k, {host, port:+port, src, name}); };
     if(window.__SERVER){ try{ const u = new URL(window.__SERVER); add(u.hostname, u.port || (u.protocol === 'https:' ? 443 : 80), 'сервер игры'); }catch(e){} }
     else if(/^https?:$/.test(location.protocol) && location.hostname) add(location.hostname, location.port || (location.protocol === 'https:' ? 443 : 80), 'этот сервер');
-    add('127.0.0.1', 8000, 'локальный', 'Локальный сервер');
     try{ saved().forEach(x => x && x.host && add(x.host, x.port || 8000, 'сохранённый', x.name)); }catch(e){}
     const res = await Promise.all([...cand.values()].map(probe));
     const seen = new Set(), rows = [];
     res.forEach(c => { const key = c.ok ? c.name + '|' + c.port : c.host + ':' + c.port; if(seen.has(key)) return; seen.add(key); rows.push(c); });
-    mServers.length = 0;
+    mServers.length = 0; mServers.push({name:'Одиночная игра', sub:'Без сервера', cur:1, max:1, ping:0, host:'', port:0, solo:true});
     rows.forEach(c => mServers.push({name: c.name || (c.ok ? c.name : 'server anode 1'), sub: c.ok ? 'Онлайн' : 'нет ответа',
       cur: c.ok ? c.cur : 0, max: c.ok ? c.max : 0, ping: c.ok ? c.ping : '—', host: c.host, port: c.port, off: !c.ok}));
-    if(window.__SERVER && !refresh._sel && mServers.length > 0){ mSelServer = 0; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
+    if(!refresh._sel){ mSelServer = 0; refresh._sel = true; }   // в APK по умолчанию выбран сервер игры
     if(mSelServer >= mServers.length) mSelServer = 0;
     renderMenuServers(); refreshing = false;
   }
@@ -6884,18 +6883,19 @@ window.OSIL_NET = (function(){
     const sb = $('start-btn');
     sb.addEventListener('click', e => {
       const s = mServers[mSelServer];
-      if(!s || s.solo){ e.stopImmediatePropagation(); e.preventDefault(); toast('Выберите сервер'); return; }
+      if(!s){ e.stopImmediatePropagation(); e.preventDefault(); toast('Выберите режим'); return; }
+      if(s.solo){ disconnect(); return; }   // одиночная игра: сервер не нужен
       if(!authAll()[authKey(s)]){ e.stopImmediatePropagation(); e.preventDefault(); showAuth(s, '', () => { connect(s); sb.click(); }, true); return; }
       connect(s);
     }, true);
     $('pm-exit').addEventListener('click', disconnect);
     window.__NIDL = harvestables.slice(); harvestables.forEach((h,i) => { h.nid = i; });
-    mServers.length = 0; mSelServer = 0; mServers.push({name:'Локальный сервер', sub:'проверка…', cur:0, max:0, ping:'—', host:'127.0.0.1', port:8000, off:true}); renderMenuServers();
+    mServers.length = 0; mSelServer = 0; mServers.push({name:'Одиночная игра', sub:'Без сервера', cur:1, max:1, ping:0, host:'', port:0, solo:true}); renderMenuServers();
     {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
       let u0 = null;
       try{ if(window.__SERVER){ const u = new URL(window.__SERVER); u0 = {host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80))}; }
         else if(/^https?:$/.test(location.protocol) && location.hostname) u0 = {host:location.hostname, port:+(location.port || (location.protocol === 'https:' ? 443 : 80))}; }catch(e){}
-      if(u0){ u0.name = 'ANODE'; showAuth(u0, null, () => { refresh(); }, true); }
+      if(u0){ u0.name = 'ANODE'; showAuth(u0, null, () => { refresh(); }, false); }
     }
     refresh(); setInterval(() => { const ss = $('start-screen'); if(ss && ss.style.display !== 'none' && !document.hidden) refresh(); }, 15000);
     setInterval(() => {                                       // отправка своего состояния 10 раз/с
