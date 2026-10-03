@@ -640,7 +640,7 @@ def handle_msg(cl, m):
         if ty in ('wood', 'stone', 'sulfur', 'metal'):            # 50 ресурса на узел, 3–5 за удар, остаток делится без хвоста
             L = max(1, min(50, int(hp)))
             if L <= 5: take = L
-            else: lo, hi = max(3, L - 5), min(5, L - 3); take = random.randint(lo, hi)
+            else: take = random.choice([t for t in (3, 4, 5) if L - t >= 3])
             dmg = take
         hp -= dmg; loot = []
         if ty == 'scrap':
