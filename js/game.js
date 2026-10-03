@@ -43,6 +43,7 @@ document.getElementById('app').prepend(renderer.domElement);
 OSIL_TOOLS.init(renderer);
 
 function fitScreen(){
+  if(document.activeElement && document.activeElement.id==='net-chat-in') return;   // клавиатура чата не сжимает картинку
   const vv = window.visualViewport, w = Math.round(vv ? vv.width : window.innerWidth), h = Math.round(vv ? vv.height : window.innerHeight);
   camera.aspect = w/h; camera.updateProjectionMatrix();
   renderer.setSize(w, h);                       // под реальный экран устройства, без рамок
@@ -951,9 +952,26 @@ function updateCulling(dt, force){
   }
 }
 
+/* случайная точка на пляже: биом BEACH, не вода, без коллизий */
+function beachSpawn(){
+  const half = WORLD_SIZE/2-6; let fb = null;
+  for(let t=0;t<6000;t++){
+    const x=(Math.random()*2-1)*half, z=(Math.random()*2-1)*half;
+    if(biomeAt(x,z)!==B.BEACH) continue;
+    const h = heightAt(x,z); if(h < 0.35 || isWaterAt(x,z)) continue;
+    let ok = true; const cs = colNear(x,z,2);
+    for(let i=0;i<cs.length&&ok;i++){ const b=cs[i].box; if(x>b.min.x-1&&x<b.max.x+1&&z>b.min.z-1&&z<b.max.z+1) ok=false; }
+    if(!ok) continue;
+    if(!fb) fb={x,z};
+    let dry=true; for(let a=0;a<6&&dry;a++){ if(isWaterAt(x+Math.cos(a*1.047)*2, z+Math.sin(a*1.047)*2)) dry=false; }
+    if(dry) return {x,z};
+  }
+  return fb || SPAWN;
+}
 /* ---------------- Player ---------------- */
+const _bs0 = beachSpawn();
 const player = {
-  pos: new THREE.Vector3(SPAWN.x, heightAt(SPAWN.x,SPAWN.z)+2, SPAWN.z),
+  pos: new THREE.Vector3(_bs0.x, heightAt(_bs0.x,_bs0.z)+2, _bs0.z),
   velY: 0,
   onGround: false,
   yaw: Math.PI,
@@ -2596,7 +2614,7 @@ function adminGrantRes(){ ['wood','stone','metal'].forEach(k=>{ const n=1000-cou
 function adminFree(){ return ADMIN_FREE || !!(window.OSIL_ACC && OSIL_ACC.isAdmin && OSIL_ACC.isAdmin()); }   // локальный промокод ИЛИ админ на сервере   // промокод Admin6737: +1000 дерева, камня, железа
 if(ADMIN_FREE) adminGrantRes();
 window.OSIL_ADMIN = { ok(){ return ADMIN_FREE && !(window.OSIL_NET && OSIL_NET.on); }, setTime(f){ gameClock = ((f%1)+1)%1*CYCLE_LEN; skyTimer = 99; }, getTime(){ return gameClock/CYCLE_LEN; } };
-const DONATE_ITEMS = ['copter','quarry'];
+const DONATE_ITEMS = ['copter','quarry','eod_suit'];
 function donLocked(id){ return DONATE_ITEMS.includes(id) && !(window.OSIL_ACC && OSIL_ACC.owns(id)); }
 function canCraft(r, qty){
   if(donLocked(r.give && (r.give.item||r.give.tool))) return false;
@@ -3821,6 +3839,13 @@ function updateMovement(dt){
   const moveX = (-sinY*fwd + cosY*strafe) * spd * dt;
   const moveZ = (-cosY*fwd - sinY*strafe) * spd * dt;
 
+  if(collidesAt(player.pos.x, player.pos.z)){   // застряли в дереве/камне — выталкиваем наружу
+    const cs0 = colNear(player.pos.x, player.pos.z, 3);
+    for(let i=0;i<cs0.length;i++){ const b = cs0[i].box; if(cs0[i].walk) continue;
+      if(player.pos.y < b.max.y && player.pos.y+player.height > b.min.y && player.pos.x>b.min.x-0.4 && player.pos.x<b.max.x+0.4 && player.pos.z>b.min.z-0.4 && player.pos.z<b.max.z+0.4){
+        const dl=player.pos.x-(b.min.x-0.45), dr=(b.max.x+0.45)-player.pos.x, dd=player.pos.z-(b.min.z-0.45), du=(b.max.z+0.45)-player.pos.z, m=Math.min(dl,dr,dd,du);
+        if(m===dl) player.pos.x=b.min.x-0.45; else if(m===dr) player.pos.x=b.max.x+0.45; else if(m===dd) player.pos.z=b.min.z-0.45; else player.pos.z=b.max.z+0.45; } }
+  }
   const nx = player.pos.x+moveX, nz = player.pos.z+moveZ;
   /* слишком крутой подъём (> ~50°) не пройти, как скалу в Rust; в прыжке — не мешает */
   const steep = (x1,z1)=>{ if(!player.onGround) return false; const d=Math.hypot(x1-player.pos.x,z1-player.pos.z); return d>1e-6 && (heightAt(x1,z1)-heightAt(player.pos.x,player.pos.z))/d > 1.2; };
@@ -5416,6 +5441,7 @@ function bzSnd(name,b,vol,rate){
 }
 function boarDamage(b,dmg){
   if(b.dead) return;
+  if(window.__BOAR_GUEST && window.__BOAR_GUEST() && window.OSIL_NET && OSIL_NET.boarHit){ const bi=boars.indexOf(b); if(bi>=0) OSIL_NET.boarHit(bi,dmg); }
   b.hp-=dmg; b.flash=1; b.recoil=0.25; b.aggro=true; b.jig=1;
   if(b.hp<=0){ killBoar(b); return; }
   bzSnd('player_scream',b,0.5,0.55+Math.random()*0.15);
@@ -5612,7 +5638,11 @@ function updateBoars(dt){
     if(b.dead){ updateCorpse(b,dt); continue; }
     if(d2>130*130) continue;
     const dist=Math.sqrt(d2);
-    bzAI(b,dt,dx,dz,dist); bzAnim(b,dt);
+    if(window.__BOAR_GUEST && window.__BOAR_GUEST()){
+      if(b._nx!==undefined){ const k=Math.min(1,dt*8), ox=b.x, oz=b.z; b.x+=(b._nx-b.x)*k; b.z+=(b._nz-b.z)*k; b.y=heightAt(b.x,b.z);
+        let dy=b._ny-b.yaw; dy=Math.atan2(Math.sin(dy),Math.cos(dy)); b.yaw+=dy*k; b.sp=Math.hypot(b.x-ox,b.z-oz)/Math.max(dt,1e-3); b.state=b._ns||b.state; }
+    } else bzAI(b,dt,dx,dz,dist);
+    bzAnim(b,dt);
     b.shT-=dt; if(b.shT<=0){ b.shT=0.5; const sh=d2<40*40; for(const m of b.meshes) m.castShadow=sh; }
   }
 }
@@ -5775,7 +5805,7 @@ function _initRoadWorld(){
     [[3.8,0.8,1.7,0,0.45,0],[2.0,0.7,1.6,-0.2,1.05,0]].forEach(a=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(a[0],a[1],a[2]),a[4]>1?glass:cb); m.position.set(a[3],a[4],a[5]); m.castShadow=true; car.add(m); });
     [[-1.3,0.28,0.85],[1.3,0.28,0.85],[-1.3,0.28,-0.85],[1.3,0.28,-0.85]].forEach(p=>{ const w=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.22,12),tireM); w.rotation.x=Math.PI/2; w.position.set(p[0],p[1],p[2]); car.add(w); });
     car.position.set(X-9,y0+0.12,Z+7); car.rotation.y=0.5; car.rotation.z=0.03; scene.add(car); addCollider(car);
-    makeCrate(X+5,Z-5.2,y0+0.12,'gas'); makeCrate(X-3,Z-12.2,y0+0.12,'gas');
+    makeCrate(X+5,Z-5.2,y0+0.12,'gas'); makeCrate(X-8,Z-9,y0+0.12,'gas');
   }
   { /* ===== АГРОПРОМ ===== */
     const __ag0=new Set(scene.children);
@@ -5837,7 +5867,7 @@ function _initRoadWorld(){
 function segBlocked(ox,oy,oz,tx,ty,tz){   // отрезок задевает коллайдер или рельеф?
   const dx=tx-ox, dy=ty-oy, dz=tz-oz, L=Math.hypot(dx,dy,dz); if(L<0.5) return false;
   const x0=Math.min(ox,tx)-0.1, x1=Math.max(ox,tx)+0.1, z0=Math.min(oz,tz)-0.1, z1=Math.max(oz,tz)+0.1;
-  const tMin=0.3/L, tMax=1-0.12/L;
+  const tMin=0.02/L, tMax=1-0.12/L;
   for(let i=0;i<colliders.length;i++){ const c=colliders[i].box; if(c.max.x<x0||c.min.x>x1||c.max.z<z0||c.min.z>z1) continue;
     let t0=0, t1=1, ok=true;
     const ax=[[ox,dx,c.min.x,c.max.x],[oy,dy,c.min.y,c.max.y],[oz,dz,c.min.z,c.max.z]];
@@ -5848,8 +5878,9 @@ function segBlocked(ox,oy,oz,tx,ty,tz){   // отрезок задевает к�
   for(let sd=0.75; sd<L-0.5; sd+=0.75){ const x=ox+dx/L*sd, y=oy+dy/L*sd, z=oz+dz/L*sd; if(y<heightAt(x,z)) return true; }
   return false;
 }
-function botSee(b){   // прямая видимость: рельеф + коллайдеры (точный луч)
-  return !segBlocked(b.x, heightAt(b.x,b.z)+1.5, b.z, player.pos.x, player.pos.y+1.2, player.pos.z);
+function botSee(b){   // прямая видимость: рельеф + коллайдеры (точный луч), глаза и грудь
+  const gy=heightAt(b.x,b.z);
+  return !segBlocked(b.x, gy+1.5, b.z, player.pos.x, player.pos.y+1.2, player.pos.z) && !segBlocked(b.x, gy+1.0, b.z, player.pos.x, player.pos.y+1.0, player.pos.z);
 }
 function botShot(dmg){
   if(!bots.length) return;
@@ -5866,9 +5897,11 @@ function botShot(dmg){
 function botFire(b){
   const y=heightAt(b.x,b.z), ox=b.x-Math.sin(b.yaw+Math.PI)*0.6, oy=y+1.35, oz=b.z-Math.cos(b.yaw+Math.PI)*0.6;
   const tx=player.pos.x, ty=player.pos.y+1.1, tz=player.pos.z, dx=tx-ox, dy=ty-oy, dz=tz-oz, L=Math.hypot(dx,dy,dz), hl=Math.max(0.01,Math.hypot(dx,dz));
-  const sp=0.035, ex=(Math.random()*2-1)*sp*L, ey=(Math.random()*2-1)*sp*L, px=-dz/hl, pz=dx/hl;
+  const sp=0.06, ex=(Math.random()*2-1)*sp*L, ey=(Math.random()*2-1)*sp*L, px=-dz/hl, pz=dx/hl;
   const ax=tx+px*ex, ay=ty+ey, az=tz+pz*ex;
-  if(Math.hypot(ex,ey)<0.55 && !segBlocked(ox,oy,oz,ax,ay,az)){ bzHurtPlayer(7+Math.random()*3); camKick=0.05; }
+  const clear = !segBlocked(b.x,y+1.4,b.z,ox,oy,oz) && !segBlocked(ox,oy,oz,ax,ay,az) && !segBlocked(b.x,y+1.0,b.z,tx,ty,tz);
+  if(!clear) return;   // стена на пути — не стреляет (ни урона, ни трассера)
+  if(Math.hypot(ex,ey)<0.55){ bzHurtPlayer(5+Math.random()*3); camKick=0.05; }
   let ln=_trPool.pop();
   if(!ln){ ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),botTrMat); ln.frustumCulled=false; }
   const pa=ln.geometry.attributes.position; pa.setXYZ(0,ox,oy,oz); pa.setXYZ(1,ox+(ax-ox)*1.15,oy+(ay-oy)*1.15,oz+(az-oz)*1.15); pa.needsUpdate=true;
@@ -5904,7 +5937,9 @@ function updateRoadWorld(dt){
     let da=want-b.yaw; da=Math.atan2(Math.sin(da),Math.cos(da)); b.yaw+=bzC(da,-dt*6,dt*6);
     m.root.rotation.y=b.yaw+Math.PI; m.root.position.set(b.x,gy+Math.sin(performance.now()/700+b.hx)*0.004,b.z);
     b.cd-=dt;
-    if(b.los&&dist<range&&Math.abs(da)<0.25&&b.cd<=0){ botFire(b); b.burst++; if(b.burst>=5){ b.burst=0; b.cd=0.45+Math.random()*0.3; } else b.cd=0.11; }
+    if(b.mag===undefined){ b.mag=15; b.rl=0; }
+    if(b.rl>0){ b.rl-=dt; if(b.rl<=0) b.mag=15; }
+    else if(b.los&&dist<range&&Math.abs(da)<0.2&&b.cd<=0){ botFire(b); b.mag--; b.burst++; if(b.mag<=0){ b.rl=3.5; b.burst=0; b.cd=0.5; } else if(b.burst>=3){ b.burst=0; b.cd=0.9+Math.random()*0.6; } else b.cd=0.22; }
   }
 }
 function takeLoot(){
@@ -6001,7 +6036,7 @@ const copter={exists:false,hp:100,max:100,hitT:0,owner:'me',pilot:false,x:0,z:0,
   }
   const disc=new THREE.Mesh(new THREE.CircleGeometry(2.7,28),new THREE.MeshBasicMaterial({color:0xbbbbbb,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide})); disc.rotation.x=-Math.PI/2; disc.position.set(0,2.66,-0.05); disc.raycast=()=>{}; g.add(disc);
   g.rotation.order='YXZ'; g.visible=false; scene.add(g);
-  copter.grp=g; copter.blades=hub; copter.disc=disc;
+  copter.grp=g; copter.blades=hub; hub.userData.isHub=true; copter.disc=disc;
 })();
 let copterGhost = null;
 function updateCopterGhost(){
@@ -6501,7 +6536,7 @@ window.OSIL_NET = (function(){
   }
 
   /* ---------------- сообщения сервера ---------------- */
-  const byNid = n => harvestables.find(h => h.nid === n);
+  const byNid = n => { const t = (window.__NIDL||[])[n]; if(t && harvestables.indexOf(t)>=0) return t; return harvestables.find(h => h.nid === n); };
   function applyBuild(b){ try{ applying = true; if(b.t==='dr' || b.t==='dl' || b.t==='dok' || b.t==='dno') applyDoorNet(b); else spawnBuilt(b.k, b.x,b.y,b.z,b.r,b.l,b.b,b.tm||0,b.u); }catch(e){ console.warn('build',e); } finally{ applying = false; } }
   function removeRemote(id){ const r = remotes.get(id); if(!r) return; scene.remove(r.root); remotes.delete(id); }
   /* ---------------- мешочки с предметами ---------------- */
@@ -6597,7 +6632,10 @@ window.OSIL_NET = (function(){
       case 'auth': { const s = curSrv; if(s) authSet(s, null); disconnect(); if(s) showAuth(s, 'Сессия истекла — войдите заново', () => connect(s)); break; }
       case 'kick': toast(m.m || 'Вы отключены'); disconnect(); break;
       case 'pj': if(!remotes.has(m.id)) remotes.set(m.id, makeAvatar(m.id,m.n)); hud(); break;
-      case 'pl': removeRemote(m.id); hud(); break;
+      case 'pl': removeRemote(m.id); { const rc = rcops.get(m.id); if(rc){ scene.remove(rc.g); rcops.delete(m.id); } } hud(); break;
+      case 'bs': boarSnap(m.b); break;
+      case 'zd': if(!window.__BOAR_GUEST()){ const bb = boars[m.i]; if(bb) boarDamage(bb, m.d); } break;
+      case 'cs': if(copter.grp) copterNet(m); break;
       case 'ps': m.p.forEach(a=>{
           if(a[0] === myId) return;
           const r = remotes.get(a[0]); if(!r) return;
@@ -6664,7 +6702,7 @@ window.OSIL_NET = (function(){
   }
 
   /* ---------------- HUD и чат ---------------- */
-  let hudEl, chatLog, chatIn, chatBtn;
+  let hudEl, chatLog, chatIn, chatBtn, chatX;
   function ui(){
     hudEl = document.createElement('div'); hudEl.id = 'net-hud'; hudEl.style.display = 'none'; document.body.appendChild(hudEl);
     chatLog = document.createElement('div'); chatLog.id = 'net-chat'; document.body.appendChild(chatLog);
@@ -6674,11 +6712,15 @@ window.OSIL_NET = (function(){
       if(e.key === 'Enter'){ const v = chatIn.value.trim(); if(v) send({t:'c', m:v}); closeChat(); }
       else if(e.key === 'Escape') closeChat(); });
     chatIn.addEventListener('keyup', e=>e.stopPropagation());
-    chatBtn.addEventListener('click', openChat);
+    chatX = document.createElement('button'); chatX.id = 'net-chat-x'; chatX.textContent = '✖'; chatX.style.display = 'none'; document.body.appendChild(chatX);
+    const _cx = e=>{ e.preventDefault(); e.stopPropagation(); closeChat(); };
+    chatX.addEventListener('click', _cx); chatX.addEventListener('touchend', _cx);
+    chatBtn.addEventListener('click', ()=>{ if(chatIn.style.display==='block') closeChat(); else openChat(); });
+    document.addEventListener('pointerdown', e=>{ if(chatIn.style.display==='block' && e.target!==chatIn && e.target!==chatX && e.target!==chatBtn && !chatIn.value.trim()) closeChat(); }, true);
     window.addEventListener('keydown', e=>{ if(e.key==='Enter' && on && document.activeElement !== chatIn && $('start-screen').style.display==='none'){ e.preventDefault(); openChat(); } });
   }
-  function openChat(){ if(!on) return; if(document.exitPointerLock) document.exitPointerLock(); chatIn.style.display = 'block'; chatIn.value = ''; chatIn.focus(); }
-  function closeChat(){ chatIn.style.display = 'none'; chatIn.blur();
+  function openChat(){ if(!on) return; if(document.exitPointerLock) document.exitPointerLock(); chatIn.style.display = 'block'; chatX.style.display = 'block'; chatIn.value = ''; chatIn.focus(); }
+  function closeChat(){ chatIn.style.display = 'none'; if(chatX) chatX.style.display = 'none'; chatIn.blur(); setTimeout(fitScreen,150);
     try{ if(!isMobile() && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){} }
   function chat(n, m){
     const d = document.createElement('div'); d.className = 'nc-l' + (n ? '' : ' sys');
@@ -6711,13 +6753,13 @@ window.OSIL_NET = (function(){
     owns(id){ return !!(this.me && (this.me.items||[]).includes(id)); }
   };
   setInterval(()=>{ if(OSIL_ACC.sess()) OSIL_ACC.refresh().then(()=>{ const p=document.getElementById('m-paneDonate'); if(p && !p.classList.contains('hidden')) renderDonate(); }); }, 6000);
-  const DON = {copter:{n:'Миникоптер', d:'Личный вертолёт: после покупки можно крафтить и ставить', icon:'1/copter.webp'}, quarry:{n:'Карьер', d:'Сам добывает камень, железо и серу: можно крафтить и ставить', icon:'1/quarry.webp'}};
+  const DON = {copter:{n:'Миникоптер', d:'Личный вертолёт: после покупки можно крафтить и ставить', icon:'1/copter.webp'}, quarry:{n:'Карьер', d:'Сам добывает камень, железо и серу: можно крафтить и ставить', icon:'1/quarry.webp'}, eod_suit:{n:'Военная броня', d:'Снижает урон на 75%', icon:'1/eod_suit.webp'}};
   const COIN_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><radialGradient id='g' cx='35%25' cy='30%25' r='80%25'><stop offset='0' stop-color='%23fff3a0'/><stop offset='.55' stop-color='%23f2b705'/><stop offset='1' stop-color='%23b36b00'/></radialGradient></defs><circle cx='32' cy='32' r='30' fill='%238a5200'/><circle cx='32' cy='32' r='27' fill='url(%23g)'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23b8780a' stroke-width='3'/><path d='M32 17v30M25 24h10a5 5 0 0 1 0 10h-8a5 5 0 0 0 0 10h12' fill='none' stroke='%238a5200' stroke-width='4' stroke-linecap='round'/></svg>";
   document.documentElement.style.setProperty('--coin', 'url("'+COIN_IMG+'")');
   window.renderDonate = function(){
     const el = document.getElementById('m-donate'); if(!el) return; const me = OSIL_ACC.me, ok = !!OSIL_ACC.sess();
     let h = '<div class="sh-top"><div class="sh-title">МАГАЗИН ПРЕДМЕТОВ</div><div class="sh-coins"><span>'+(me?me.coins:mCoins)+'</span><img class="coin-i" alt=""></div></div><div class="sh-grid">';
-    Object.keys(DON).forEach(k=>{ const price = (me&&me.shop&&me.shop[k]) || (k==='copter'?420:1200), have = OSIL_ACC.owns(k);
+    Object.keys(DON).forEach(k=>{ const price = (me&&me.shop&&me.shop[k]) || ({copter:420,quarry:1200,eod_suit:350}[k]||1200), have = OSIL_ACC.owns(k);
       h += '<div class="sh-card'+(have?' own':'')+'" data-k="'+k+'"><div class="sh-price">'+(have?'КУПЛЕНО':price)+(have?'':'<img class="coin-i" alt="">')+'</div><img class="sh-img" src="'+DON[k].icon+'" alt=""><div class="sh-name">'+DON[k].n.toUpperCase()+'</div></div>'; });
     h += '</div><div id="dn-msg" class="sh-msg">'+(ok?'':'Войдите на сервер, чтобы покупать предметы')+'</div>'+
       '<div class="sh-bar"><div class="sh-info"><i>i</i>Купленные вещи из меню крафта остаются на бесконечный срок</div><button id="dn-get">ПОЛУЧИТЬ ДОНАТ<br><small>КУПИТЬ МОНЕТЫ</small></button></div>';
@@ -6847,7 +6889,7 @@ window.OSIL_NET = (function(){
       connect(s);
     }, true);
     $('pm-exit').addEventListener('click', disconnect);
-    harvestables.forEach((h,i) => { h.nid = i; });
+    window.__NIDL = harvestables.slice(); harvestables.forEach((h,i) => { h.nid = i; });
     mServers.length = 0; mSelServer = 0; mServers.push({name:'Локальный сервер', sub:'проверка…', cur:0, max:0, ping:'—', host:'127.0.0.1', port:8000, off:true}); renderMenuServers();
     {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
       let u0 = null;
@@ -6867,7 +6909,33 @@ window.OSIL_NET = (function(){
     (function loop(){ const n = performance.now(), dt = Math.min(0.1, (n-last)/1000); last = n; animRemotes(dt); animBags(dt); requestAnimationFrame(loop); })();
   }
   try{ init(); }catch(e){ alert('Ошибка net.js: ' + e.message); }
-  return {harvest, drop: dropSel, connect, disconnect, refresh, onDestroy, onHit, onBuild, onShoot, onSwing, melee, hurt, resetDie(){ dieSent = false; }, get on(){ return on; }};
+  /* ---- синхронизация кабанов (хост = клиент с наименьшим id) и коптеров ---- */
+  const BST = ['idle','graze','charge','flee','wander','dead','attack','alert'];
+  let lastBs = 0; window.__BOAR_GUEST = () => on && performance.now() - lastBs < 2500;
+  setInterval(() => { if(!on || window.__BOAR_GUEST()) return;
+    send({t:'bs', b: boars.map(b => [r2(b.x), r2(b.z), r2(b.yaw), Math.round(b.hp), b.dead ? 1 : 0, Math.max(0, BST.indexOf(b.state))])}); }, 200);
+  function boarSnap(a){ lastBs = performance.now();
+    a.forEach((v, i) => { const b = boars[i]; if(!b) return;
+      if(v[4]){ if(!b.dead) killBoar(b); return; }
+      b._nx = v[0]; b._nz = v[1]; b._ny = v[2]; b._ns = BST[v[5]] || 'idle'; if(!b.dead) b.hp = v[3];
+      if(Math.hypot(b.x - v[0], b.z - v[1]) > 15){ b.x = v[0]; b.z = v[1]; } }); }
+  const rcops = new Map(); let sentCop = false;
+  setInterval(() => { if(!on) return;
+    if(copter.exists && copter.grp){ sentCop = true; const g = copter.grp;
+      send({t:'cs', e:1, x:r2(g.position.x), y:r2(g.position.y), z:r2(g.position.z), r:r2(g.rotation.y), q:r2(g.rotation.x), w:r2(g.rotation.z), p:copter.pilot ? 1 : 0}); }
+    else if(sentCop){ sentCop = false; send({t:'cs', e:0, x:0}); } }, 100);
+  function copterNet(m){
+    let rc = rcops.get(m.id);
+    if(!m.e){ if(rc){ scene.remove(rc.g); rcops.delete(m.id); } return; }
+    if(!rc){ const g = copter.grp.clone(true); g.visible = true; let hub = null; g.traverse(o => { if(o.userData && o.userData.isHub) hub = o; });
+      scene.add(g); g.position.set(m.x, m.y, m.z); rc = {g, hub, t:performance.now()}; rcops.set(m.id, rc); }
+    rc.tx = m.x; rc.ty = m.y; rc.tz = m.z; rc.tr = m.r; rc.tq = m.q || 0; rc.tw = m.w || 0; rc.p = m.p; rc.t = performance.now(); }
+  setInterval(() => { const now = performance.now(); rcops.forEach((rc, id) => {
+    if(now - rc.t > 5000 || !on){ scene.remove(rc.g); rcops.delete(id); return; }
+    const g = rc.g, k = 0.3; g.position.x += (rc.tx - g.position.x) * k; g.position.y += (rc.ty - g.position.y) * k; g.position.z += (rc.tz - g.position.z) * k;
+    let d = rc.tr - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g.rotation.y += d * k; g.rotation.x = rc.tq; g.rotation.z = rc.tw;
+    if(rc.hub && rc.p) rc.hub.rotation.y += 0.9; }); }, 33);
+  return {boarHit(i, d){ send({t:'zd', i, d}); }, harvest, drop: dropSel, connect, disconnect, refresh, onDestroy, onHit, onBuild, onShoot, onSwing, melee, hurt, resetDie(){ dieSent = false; }, get on(){ return on; }};
 })();
 
 
@@ -6950,7 +7018,7 @@ function deathTick(){
 document.getElementById('dth-go').addEventListener('click', ()=>{
   if(!_isDead) return;
   if(copter.pilot){ copter.pilot=false; copter.vx=copter.vz=copter.vy=0; }
-  const a = Math.random()*6.283, r = 8+Math.random()*30, x = SPAWN.x+Math.cos(a)*r, z = SPAWN.z+Math.sin(a)*r;
+  const _bs = beachSpawn(), x = _bs.x, z = _bs.z;
   player.pos.set(x, heightAt(x,z)+2, z); player.velY = 0;
   player.hp = 100; player.hunger = 100; player.thirst = 100; player.stamina = 100;
   hotbarSlots[0] = {k:'rock', n:1}; selectedSlot = 0;
