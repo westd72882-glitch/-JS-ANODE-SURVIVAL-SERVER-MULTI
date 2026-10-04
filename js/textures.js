@@ -43,7 +43,7 @@ TEXTURES.tex_water = "assets/pack/sprites/water.webp";
 
 /* ---------- Новые иконки (v8) ---------- */
 [["hammer","hammer"],["mdoor","door_metal"],["scrap","scrap"],["plan","building_plan"],["bag","sleeping_bag"],["door","door"],["locker","locker"],["chest","chest_military"],
- ["satchel","satchel"],["backpack","backpack"],["spear","spear"],["helm_rusty","helmet_rusty"],["helm_home","helmet_homemade"],
+ ["satchel","satchel"],["backpack","backpack"],["spear","spear"],["knife","combat_knife"],["helm_rusty","helmet_rusty"],["helm_home","helmet_homemade"],
  ["sheet","component_sheetmetal"],["gear","component_gear"],["pipe","component_pipe"],["fuel","fuel"],["nails","nail_ammo"],
  ["nailgun","nailgun"],["pistol","pistol"],["workbench","workbench"],["armor","chest_military"],["can","component_can"],
  ["body","component_body"],["ammo556","ammo556"],["ammo","ammo"],["rifle","assault_rifle"],["cloth","cloth"],["ammo_rifle","ammo_rifle"],["ammo_pistol","ammo_pistol"],["berdanka","berdanka"],["smg","smg"],["furnace2","quarry"],["turret","turret"]

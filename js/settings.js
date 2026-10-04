@@ -85,6 +85,9 @@ window.OSIL_SETTINGS=(function(){
 
   function esc(x){ return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function fdt(t){ if(!t) return '—'; const d=new Date(t*1000); return d.toLocaleDateString('ru-RU')+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
+  function fago(t){ if(!t) return 'никогда'; const x=Math.max(0,Date.now()/1000-t); if(x<90) return 'только что'; const m=Math.floor(x/60); if(m<60) return m+' мин назад'; const h=Math.floor(m/60); if(h<24) return h+' ч назад'; return Math.floor(h/24)+' дн назад'; }
+  function fdur(min){ min=min|0; const h=Math.floor(min/60), m=min%60; return h>0 ? h+' ч '+m+' мин' : m+' мин'; }
+  let admSort='seen', admQ='';
   let admSec='players';
   async function adminPanel(body){
     body.innerHTML='<div class="set-seg" id="adm-sec" style="margin-bottom:8px"></div><div id="adm-list" style="font-size:12px">Загрузка…</div>';
@@ -106,17 +109,23 @@ window.OSIL_SETTINGS=(function(){
       };
       load(); return;
     }
-    const load=async()=>{
-      const d=await OSIL_ACC.call('/api/admin',{op:'list'});
-      if(d.error){ box.textContent=d.error; return; }
-      box.innerHTML=d.players.map(p=>'<div style="border:1px solid #55544a;border-radius:8px;padding:8px;margin:6px 0;background:rgba(0,0,0,.25)">'+
+    const view=a=>{ const q=admQ.trim().toLowerCase(); const K={seen:p=>-(p.online?1e12:(p.seen||p.last||0)), time:p=>-(p.min||0), level:p=>-(p.level||0), name:p=>p.u.toLowerCase()};
+      return a.filter(p=>!q||p.u.toLowerCase().includes(q)).sort((x,y)=>{ const u=K[admSort](x), v=K[admSort](y); return u<v?-1:u>v?1:0; }); };
+    const bar=()=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input id="ad-q" value="'+esc(admQ)+'" placeholder="Поиск по нику" style="'+I+';flex:1;margin:0"><select id="ad-s" style="'+I+';width:auto;margin:0">'+
+      [['seen','Последний заход'],['time','Время в игре'],['level','Уровень'],['name','Ник']].map(o=>'<option value="'+o[0]+'"'+(admSort===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>';
+    const load=async()=>{ const d=await OSIL_ACC.call('/api/admin',{op:'list'}); if(d.error){ box.textContent=d.error; return; } draw(d); };
+    const draw=d=>{
+      box.innerHTML=bar()+view(d.players).map(p=>'<div style="border:1px solid #55544a;border-radius:8px;padding:8px;margin:6px 0;background:rgba(0,0,0,.25)">'+
         '<b style="font-size:14px">'+esc(p.u)+'</b> '+(p.admin?'<span style="color:#e8c25a">[админ]</span> ':'')+(p.online?'<span style="color:#8fd16a">● онлайн</span> ':'')+(p.banned?'<span style="color:#e06060">[БАН]</span> ':'')+(p.ipbanned?'<span style="color:#e06060">[IP-БАН]</span>':'')+
-        '<div style="opacity:.85;margin-top:3px">Ур. '+p.level+' ('+p.xp+' оп.) · монеты '+p.coins+' · убийств '+p.kills+' · смертей '+p.deaths+' · '+p.min+' мин</div>'+
+        '<div style="opacity:.85;margin-top:3px">Ур. '+p.level+' ('+p.xp+' оп.) · монеты '+p.coins+' · убийств '+p.kills+' · смертей '+p.deaths+' · наиграно: <b style="color:#ffe08a">'+fdur(p.min)+'</b></div>'+
         '<div style="opacity:.85">Донат: '+(p.items.join(', ')||'нет')+'</div>'+
-        '<div style="opacity:.7">Вход: '+fdt(p.last)+' · создан: '+fdt(p.created)+'</div>'+
+        '<div style="opacity:.7">Последний заход: <b>'+(p.online?'<span style="color:#8fd16a">сейчас в игре</span>':fago(p.seen||p.last)+' · '+fdt(p.seen||p.last))+'</b> · создан: '+fdt(p.created)+'</div>'+
         '<div style="opacity:.7;word-break:break-all">IP: '+esc(p.ips.join(', ')||'—')+'</div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px" data-u="'+esc(p.u)+'">'+
         ['kick:Кик',p.banned?'unban:Разбан':'ban:Бан','banip:Бан IP','setcoins:Монеты','setxp:Опыт','giveitem:+Предмет','takeitem:−Предмет','reset:Обнулить','delete:Удалить'].map(x=>{const a=x.split(':');return '<button class="set-tg on" data-op="'+a[0]+'" style="'+B+'">'+a[1]+'</button>';}).join('')+'</div></div>').join('')||'Нет игроков';
+      const qi=box.querySelector('#ad-q'), ss=box.querySelector('#ad-s');
+      qi.oninput=()=>{ admQ=qi.value; const pos=qi.selectionStart; draw(d); const n=box.querySelector('#ad-q'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+      ss.onchange=()=>{ admSort=ss.value; draw(d); };
       box.querySelectorAll('button[data-op]').forEach(b=>b.addEventListener('click',async()=>{
         const op=b.dataset.op, u=b.parentNode.dataset.u, body={op,target:u};
         if(op==='setcoins'||op==='setxp'){ const v=prompt((op==='setxp'?'Опыт':'Монеты')+' у '+u+'?'); if(v===null) return; body.v=parseInt(v)||0; }

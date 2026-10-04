@@ -187,10 +187,11 @@ window.OSIL_TOOLS = (function(){
     M.rope  = new T.MeshStandardMaterial({map:rope, normalMap:rN, normalScale:nS(1.1), roughness:0.95, envMap:env, envMapIntensity:0.15});
     M.metal = new T.MeshStandardMaterial({map:metal, normalMap:mN, normalScale:nS(0.9), roughnessMap:orm, metalnessMap:orm, color:0xe4e8ee, roughness:1, metalness:1, envMap:env, envMapIntensity:1.0});
     M.dark  = new T.MeshStandardMaterial({map:metal, normalMap:mN, normalScale:nS(0.9), roughnessMap:orm, metalnessMap:orm, color:0x8b8f96, roughness:1, metalness:1, envMap:env, envMapIntensity:0.9});
-    M.skin  = new T.MeshStandardMaterial({map:skin, normalMap:sN, normalScale:nS(0.45), roughness:0.6, emissive:0x1f0c07, envMap:env, envMapIntensity:0.14});
+    M.skin  = new T.MeshPhysicalMaterial({map:skin, normalMap:sN, normalScale:nS(0.5), roughness:0.55, emissive:0x2a0f08, clearcoat:0.14, clearcoatRoughness:0.55, sheen:new T.Color(0x7a3f2c), envMap:env, envMapIntensity:0.18});
     M.crease= new T.MeshStandardMaterial({color:0x8d5439, roughness:0.85});
     M.cloth = new T.MeshStandardMaterial({map:cloth, normalMap:cN, normalScale:nS(0.9), roughness:1});
-    M.nail  = new T.MeshStandardMaterial({color:0xdcae98, roughness:0.28, envMap:env, envMapIntensity:0.6});
+    M.nail  = new T.MeshStandardMaterial({color:0xe4b9a6, roughness:0.22, envMap:env, envMapIntensity:0.7});
+    M.rubber= new T.MeshStandardMaterial({color:0x1b1b1c, roughness:0.72, metalness:0.12, envMap:env, envMapIntensity:0.35});
     initGun(env);
   }
 
@@ -346,6 +347,12 @@ window.OSIL_TOOLS = (function(){
     tube(curve, rfn, 28, 14, M.skin, parent);
     ball(pts[0], fr*1.13, M.skin, parent, 1, 1, 0.95);                    // костяшка (MCP)
     const pe = curve.getPoint(1); ball(pe, rfn(1)*0.98, M.skin, parent, 1, 0.95, 1);
+    { const tgE = curve.getTangent(1), nn = new T.Vector3(pe.x,0,pe.z); if(nn.lengthSq() < 1e-8) nn.set(1,0,0); nn.normalize(); nn.addScaledVector(tgE, -nn.dot(tgE)).normalize();
+      const bb = new T.Vector3().crossVectors(nn, tgE).normalize(), r1 = rfn(1);
+      const nl = new T.Mesh(new T.SphereGeometry(1,12,8), M.nail);
+      nl.scale.set(r1*0.64, r1*0.2, r1*0.9);
+      nl.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(bb, nn, tgE));
+      nl.position.copy(pe).addScaledVector(nn, r1*0.74).addScaledVector(tgE, -r1*0.22); parent.add(nl); }
     joints.forEach(j=>{
       const p = curve.getPoint(j), tg = curve.getTangent(j);
       const n = new T.Vector3(p.x,0,p.z).normalize(); n.addScaledVector(tg, -n.dot(tg)).normalize();
@@ -399,7 +406,7 @@ window.OSIL_TOOLS = (function(){
     const g = new T.Group(), V2 = T.Vector2;
     const fore = new T.Group();
     const sp = [];
-    for(let i=0;i<=20;i++){ const y = 0.17*i/20, k = Math.min(1,y/0.16), sm = k*k*(3-2*k); sp.push(new V2(0.0255 + 0.012*sm + 0.0035*Math.sin(PI*k), y)); }
+    for(let i=0;i<=20;i++){ const y = 0.17*i/20, k = Math.min(1,y/0.16), sm = k*k*(3-2*k); sp.push(new V2(0.0255 + 0.012*sm + 0.0035*Math.sin(PI*k) + 0.0032*Math.sin(PI*Math.min(1,y/0.17)), y)); }
     const skin = new T.Mesh(new T.LatheGeometry(sp, 24), M.skin); skin.scale.set(1.12,1,0.88); fore.add(skin);
     const cuff = new T.Mesh(new T.TorusGeometry(0.044,0.0105,10,24), M.cloth); cuff.rotation.x = PI/2; cuff.position.y = 0.168; fore.add(cuff);
     const cuff2 = new T.Mesh(new T.TorusGeometry(0.047,0.0085,10,24), M.cloth); cuff2.rotation.x = PI/2; cuff2.position.y = 0.186; fore.add(cuff2);
@@ -1255,5 +1262,32 @@ window.OSIL_TOOLS = (function(){
     return g;
   }
 
-  return { init, makeHoloSight, makeRifle, makePistol, makeBerdanka, makeSMG, makeRPG, makeSatchel, makePickaxe, makeAxe, makeSpear, addHands, updateArms, materials:M };
+  /* ---------------- Боевой нож: чёрная рукоять с рёбрами, гарда с кольцом, клинок с пилой и отверстием ---------------- */
+  function makeKnife(){
+    const g = new T.Group(), gl = 0.138;
+    const gp = [new T.Vector2(0.0001,-0.016), new T.Vector2(0.0300,-0.016), new T.Vector2(0.0320,-0.010), new T.Vector2(0.0300,0.000)];
+    for(let i=0;i<=60;i++){ const y = 0.004 + (gl-0.004)*i/60; gp.push(new T.Vector2(0.0262 + 0.0018*Math.sin(PI*y/gl) + 0.0013*Math.max(0, Math.sin(y*270)), y)); }
+    gp.push(new T.Vector2(0.0292, gl+0.002)); gp.push(new T.Vector2(0.0001, gl+0.002));
+    g.add(new T.Mesh(new T.LatheGeometry(gp, 28), M.rubber));
+    const guard = new T.Mesh(new T.BoxGeometry(0.015,0.016,0.070), M.dark); guard.position.set(0,gl+0.010,0); g.add(guard);
+    const ring = new T.Mesh(new T.TorusGeometry(0.0165,0.0034,8,22), M.dark); ring.rotation.y = PI/2; ring.position.set(0,gl+0.012,0.050); g.add(ring);
+    const sb = -0.011, eb = 0.023, L = 0.215, s = new T.Shape();
+    s.moveTo(sb,0); s.lineTo(sb,0.03);
+    for(let i=0;i<7;i++){ const y0 = 0.03 + i*0.0135; s.lineTo(sb-0.0048,y0+0.0015); s.lineTo(sb,y0+0.0135); }
+    s.lineTo(sb,0.152); s.quadraticCurveTo(-0.003,0.19, 0.004,L);
+    s.bezierCurveTo(0.021,0.195, 0.026,0.10, eb,0.0); s.lineTo(sb,0);
+    const hole = new T.Path(); hole.absellipse(0.006,0.168,0.0034,0.0075,0,PI*2,false,0); s.holes.push(hole);
+    const geo = new T.ExtrudeGeometry(s, {depth:0.0046, steps:1, bevelEnabled:true, bevelThickness:0.0007, bevelSize:0.0007, bevelSegments:1, curveSegments:14});
+    geo.translate(0,0,-0.0023); geo.rotateY(PI/2);
+    const blade = new T.Mesh(geo, M.metal); blade.position.y = gl+0.018; g.add(blade);
+    const fuller = new T.Mesh(new T.BoxGeometry(0.0054,0.115,0.0042), M.dark); fuller.position.set(0,gl+0.018+0.105,-0.0035); g.add(fuller);
+    const hR = makeHand(1, 0.072); g.add(hR);
+    const aR = makeArm(1); aR.userData.wristLocal = hR.userData.wrist.clone(); aR.userData.hand = hR;
+    g.userData.arms = [aR]; g.userData.hands = [hR];
+    g.userData.slide = 0; g.userData.squeeze = 0; g.userData.shoulderShift = new T.Vector3();
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow = false; o.receiveShadow = false; } });
+    return g;
+  }
+
+  return { init, makeHoloSight, makeRifle, makePistol, makeBerdanka, makeSMG, makeRPG, makeSatchel, makePickaxe, makeAxe, makeSpear, makeKnife, addHands, updateArms, materials:M };
 })();

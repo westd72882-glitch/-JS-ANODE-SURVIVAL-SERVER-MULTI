@@ -1088,7 +1088,10 @@ function buildHumanRig(jc){
     bx(0.165,0.39,0.165,jacket,0,-0.11,0,sh);                      // плечо (от уровня верха корпуса)
     const el=grp(0,-0.3,0); sh.add(el);
     bx(0.158,0.17,0.158,jacketD,0,-0.07,0,el);                    // рукав
-    bx(0.150,0.16,0.150,skinM,0,-0.22,0,el);                      // предплечье и кисть
+    bx(0.128,0.15,0.128,skinM,0,-0.225,0,el);                       // предплечье
+    bx(0.112,0.075,0.07,skinM,0,-0.318,0,el);                       // ладонь
+    for(let i=0;i<4;i++){ const fg=bx(0.025,0.062,0.024,skinM,-0.040+i*0.027,-0.358,-0.032,el); fg.rotation.x=0.55; }   // пальцы
+    { const sg=x>0?1:-1, th=bx(0.03,0.055,0.03,skinM,-sg*0.07,-0.326,-0.022,el); th.rotation.z=sg*0.5; }              // большой палец
     const hold=grp(0,-0.3,0); el.add(hold);
     torso.add(sh); return {sh,el,hold};
   };
@@ -1113,7 +1116,8 @@ function setRigSuit(m,on){
   m.suit=out;
 }
 const playerModel=(function(){ const m=buildHumanRig(0x4d5b3d); m.lx=player.pos.x; m.lz=player.pos.z; m.root.visible=false; scene.add(m.root); return m; })();
-const RIG_TOOLS={rock:1,axe:1,pickaxe:1,rifle:1,pistol:1,berdanka:1,smg:1,spear:1};
+const RIG_TOOLS={rock:1,axe:1,pickaxe:1,rifle:1,pistol:1,berdanka:1,smg:1,spear:1,rpg:1,grenade:1,satchel:1,hammer:1,knife:1};
+const ONE_HAND={knife:1,grenade:1,satchel:1,hammer:1};
 function setRigTool(m,k){
   if(!RIG_TOOLS[k]) k='none';
   if(k===m.heldKind) return;
@@ -1122,12 +1126,12 @@ function setRigTool(m,k){
   if(k==='none') return;
   let t=m.toolMeshes[k];
   if(!t){
-    const src = k==='rock' ? makeRockMesh(0.11) : k==='axe' ? makeAxeModel() : k==='rifle' ? OSIL_TOOLS.makeRifle(false) : k==='pistol' ? OSIL_TOOLS.makePistol(false) : k==='berdanka' ? OSIL_TOOLS.makeBerdanka(false) : k==='smg' ? OSIL_TOOLS.makeSMG(false) : k==='rpg' ? OSIL_TOOLS.makeRPG(false) : k==='spear' ? OSIL_TOOLS.makeSpear() : makePickaxeModel();
-    t=new THREE.Group(); t.add(src);
-    src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(k==='rock'?1:((k==='rifle'||k==='berdanka'||k==='smg'||k==='rpg')?0.85:(k==='pistol'?1.0:(k==='spear'?1.0:1.15))));
+    const src = k==='rock' ? makeRockMesh(0.11) : k==='axe' ? makeAxeModel() : k==='rifle' ? OSIL_TOOLS.makeRifle(false) : k==='pistol' ? OSIL_TOOLS.makePistol(false) : k==='berdanka' ? OSIL_TOOLS.makeBerdanka(false) : k==='smg' ? OSIL_TOOLS.makeSMG(false) : k==='rpg' ? OSIL_TOOLS.makeRPG(false) : k==='knife' ? OSIL_TOOLS.makeKnife() : k==='grenade' ? makeGrenadeMesh() : k==='satchel' ? OSIL_TOOLS.makeSatchel(false) : k==='hammer' ? makeHammerModel() : k==='spear' ? OSIL_TOOLS.makeSpear() : makePickaxeModel();
+    t=new THREE.Group(); t.add(src); if(src.userData && src.userData.hands) src.userData.hands.forEach(h=>{ h.visible=false; });
+    src.position.set(0,0,0); src.rotation.set(0,0,0); src.scale.setScalar(k==='rock'?1:((k==='rifle'||k==='berdanka'||k==='smg'||k==='rpg')?0.85:(k==='pistol'?1.0:((k==='spear'||k==='knife')?1.0:(k==='grenade'?1.5:(k==='satchel'?0.8:1.15))))));
     src.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
-    t.rotation.set((k==='rifle'||k==='pistol'||k==='berdanka'||k==='smg'||k==='rpg')?-Math.PI/2:(k==='spear'?-1.05:-1.25),0,0);
-    if(k==='rock') src.position.set(0,0.1,0); else if(k==='rifle') src.position.set(0,0.077,-0.077); else if(k==='pistol') src.position.set(0,0.064,0.034); else if(k==='berdanka') src.position.set(0,0.066,-0.046); else if(k==='smg') src.position.set(0,0.070,-0.060); else if(k==='rpg') src.position.set(0,0.05,-0.02);
+    t.rotation.set((k==='rifle'||k==='pistol'||k==='berdanka'||k==='smg'||k==='rpg')?-Math.PI/2:(k==='spear'?-1.05:(k==='knife'?-1.15:((k==='grenade'||k==='satchel')?0:-1.25))),0,0);
+    if(k==='rock') src.position.set(0,0.1,0); else if(k==='rifle') src.position.set(0,0.077,-0.077); else if(k==='pistol') src.position.set(0,0.064,0.034); else if(k==='berdanka') src.position.set(0,0.066,-0.046); else if(k==='smg') src.position.set(0,0.070,-0.060); else if(k==='rpg') src.position.set(0,0.05,-0.02); else if(k==='knife') src.position.set(0,-0.07,0);
     if(k==='rifle'||k==='pistol'||k==='berdanka'||k==='smg') m.rifleFlash=src.userData.flash||null;
     m.toolMeshes[k]=t;
   }
@@ -1172,7 +1176,7 @@ function poseRig(m,dt,sp,onGround,crouch,pitch,aim){
   }
   m.torso.rotation.set(crouch*0.35, s*0.12, 0);
   m.head.rotation.x = -pitch*0.5 - crouch*0.3;
-  if(held){       // вторая рука держит рукоять
+  if(held && !ONE_HAND[m.heldKind]){ // вторая рука держит рукоять
     m.root.updateMatrixWorld(true);
     if(m.heldKind==='pistol') _gp.set(-0.01,-0.03,0.04); else if(m.heldKind==='berdanka') _gp.set(0,0.06,-0.26); else if(m.heldKind==='smg') _gp.set(0,0.06,-0.20); else if(m.heldKind==='rpg') _gp.set(0,0.0,-0.185); else if(rifle) _gp.set(0,0.07,-0.34); else if(m.heldKind==='spear') _gp.set(0,0.5,0); else _gp.set(0,0.3,0);
     m.held.localToWorld(_gp); m.torso.worldToLocal(_gp);
@@ -1299,6 +1303,7 @@ function throwSatchel(){
   if(!stickOrLand(o, sp)){
     const m = makeSatchelMesh(); m.scale.setScalar(0.85); m.position.copy(sp); scene.add(m);
     thrown.push({m, v:d.clone().multiplyScalar(11).add(new THREE.Vector3(0,2.4,0)), t:0, spin:new THREE.Vector3(6,2,4)});
+    if(window.OSIL_NET) OSIL_NET.fx('sa', sp, d);
   }
   satchelHideT = 0.55;
   if(currentToolMesh){ currentToolMesh.visible = false; if(currentArms) currentArms.forEach(a=>a.visible=false); }
@@ -1512,6 +1517,7 @@ function throwGrenade(){
   OSIL_AUDIO.play('inventory_open', {vol:0.9});
   const m = makeGrenadeMesh(); m.position.copy(sp); scene.add(m);
   grenades.push({m, v:d.clone().multiplyScalar(14).add(new THREE.Vector3(0,3.2,0)), t:0, spin:new THREE.Vector3(9,3,6), rest:false});
+  if(window.OSIL_NET) OSIL_NET.fx('gr', sp, d);
   satchelHideT = 0.55;
   if(currentToolMesh){ currentToolMesh.visible = false; if(currentArms) currentArms.forEach(a=>a.visible=false); }
   updateResourceUI(); refreshHeld();
@@ -1596,6 +1602,7 @@ function fireRocket(){
   const sp = o.clone().addScaledVector(d, 0.9); sp.y -= 0.08;
   const m = makeRocketMesh(); m.position.copy(sp); m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1), d); scene.add(m);
   rockets.push({m, v:d.clone().multiplyScalar(RPG_SPEED), t:0, tr:0});
+  if(window.OSIL_NET) OSIL_NET.fx('rk', sp, d);
   OSIL_AUDIO.play('ak', {vol:1, rate:0.45}); camKick = Math.max(camKick||0, 0.18);
   { const fl = currentToolMesh && currentToolMesh.userData.flash, rk = currentToolMesh && currentToolMesh.userData.rocket;
     if(fl){ fl.visible = true; setTimeout(()=>{ fl.visible = false; }, 90); }
@@ -1714,7 +1721,7 @@ function quFuel(all){
   n = Math.min(all ? n : 1, room); if(n <= 0){ showToast('Бак карьера полон'); return; }
   removeItem('fuel', n);
   if(quNet()) OSIL_NET.onBuild({t:'qf', id, n}); else st.f += n*QUAR_FUEL;
-  OSIL_AUDIO.play('build', {vol:0.5}); updateResourceUI(); updateQuarryText();
+  OSIL_AUDIO.play('build', {vol:0.5}); fuelFx(id); updateResourceUI(); updateQuarryText();
 }
 function quTake(){
   const id = quarOpenId; if(id === null) return;
@@ -1726,12 +1733,19 @@ function quTake(){
 }
 let _quT = 0;
 const quarObjs = new Set(), quarActive = new Set();      // quarActive — id работающих карьеров в сети (шлёт сервер)
+function fuelFx(id){
+  const p = parts.get(id); if(!p || !p.obj) return; const b = p.obj.position, R = ()=>Math.random()-.5;
+  for(let i=0;i<7;i++) fxEmit('smoke', new THREE.Vector3(b.x+R()*0.8, b.y+1.2+Math.random()*0.6, b.z+R()*0.8), new THREE.Vector3(R()*0.8,0.9+Math.random()*0.8,R()*0.8), 1.4, 0.3, 1.3, 0x8f8a82, 0xd8d4cc, {drag:1.2, a:0.5});
+  for(let i=0;i<5;i++) fxEmit('fire', new THREE.Vector3(b.x+R()*0.5, b.y+1.1+Math.random()*0.4, b.z+R()*0.5), new THREE.Vector3(R()*0.4,0.6+Math.random()*0.6,R()*0.4), 0.4, 0.3, 0.06, 0xfff2c0, 0xff7a1a, {a:0.9});
+  for(let i=0;i<5;i++) fxEmit('spark', new THREE.Vector3(b.x+R()*0.5, b.y+1.2, b.z+R()*0.5), new THREE.Vector3(R()*2.4,1.2+Math.random()*2,R()*2.4), 0.7, 0.07, 0.02, 0xffd27a, 0xff6a1a, {g:6, a:1});
+}
 function quarryAnim(dt){
   quarObjs.forEach(id=>{
     const p = parts.get(id); if(!p){ quarObjs.delete(id); return; }
     const sp = p.obj.userData.spin; if(!sp) return;
     if(Math.abs(p.obj.position.x-player.pos.x)+Math.abs(p.obj.position.z-player.pos.z) > 130) return;
     const act = quNet() ? quarActive.has(id) : ((quarState.get(id)||{}).f > 0);
+    if(act && CFG.particles){ const u = p.obj.userData; u._sm = (u._sm||0) - dt; if(u._sm <= 0){ u._sm = 0.3; fxEmit('smoke', new THREE.Vector3(p.obj.position.x+0.4, p.obj.position.y+2.8, p.obj.position.z), new THREE.Vector3(0.1,1.0,0.05), 2.2, 0.25, 1.6, 0x6f6a63, 0xb8b3ab, {drag:0.6, a:0.45}); } }
     const v = p.obj.userData.sv || 0, nv = v + ((act?4.2:0)-v)*Math.min(1, dt*(act?1.1:0.7));
     p.obj.userData.sv = nv; if(nv > 0.02) sp.rotation.y += nv*dt;
   });
@@ -1769,6 +1783,8 @@ function furnaceTick(dt){
       f.fuel[fk]--; f.burn = FUEL_BURN[fk];
     }
     f.burn -= dt; f.t += dt;
+    if(CFG.particles){ f._sm = (f._sm||0) - dt; if(f._sm <= 0){ f._sm = 0.3; const pp = parts.get(id);
+      if(pp && pp.obj && Math.hypot(pp.obj.position.x-player.pos.x, pp.obj.position.z-player.pos.z) < 50) fxEmit('smoke', pp.obj.position.clone().add(new THREE.Vector3(0,1.7,0)), new THREE.Vector3(0.05,0.9,0.05), 1.8, 0.2, 1.1, 0x6f6a63, 0xb8b3ab, {drag:0.7, a:0.45}); } }
     while(f.t >= SMELT_T){
       const ok = f.ore.metal_ore > 0 ? 'metal_ore' : f.ore.sulfur_ore > 0 ? 'sulfur_ore' : null;
       if(!ok){ f.t = 0; break; }
@@ -1785,7 +1801,7 @@ function furTransfer(ref){          // предмет из сумки → печ
   const sl = getAt(ref); if(!sl || furOpenId===null) return false;
   const f = furSt(furOpenId);
   if(FUR_IN[sl.k]){ f.ore[sl.k] += sl.n; setAt(ref, null); }
-  else if(FUEL_BURN[sl.k]){ f.fuel[sl.k] += sl.n; setAt(ref, null); }
+  else if(FUEL_BURN[sl.k]){ f.fuel[sl.k] += sl.n; setAt(ref, null); fuelFx(furOpenId); }
   else { showToast('Печка принимает руду и топливо'); return false; }
   OSIL_AUDIO.play('build', {vol:0.4}); storRefreshF(); return true;
 }
@@ -1937,7 +1953,6 @@ function fireGun(){
   sl.m--;
   const G_ = GUNS[sl.k];
   hitCooldown = G_.rate;
-  if(window.OSIL_NET) OSIL_NET.onShoot();
   OSIL_AUDIO.play(G_.snd,{vol:0.8,rate:G_.rate2});
   const kick = (1 - 0.4*aimK) * (sl.k==='pistol' ? 0.9 : (sl.k==='smg' ? 0.7 : 1));                                          // в прицеливании отдача мягче
   camKick = 0.02*kick;
@@ -1948,6 +1963,7 @@ function fireGun(){
   if(fl){ fl.visible = true; fl.rotation.z = Math.random()*6; fl.scale.setScalar(0.8+Math.random()*0.5); clearTimeout(fireGun._h); fireGun._h = setTimeout(()=>{ fl.visible=false; },45); }
   ejectCasing();
   shotImpact();
+  if(window.OSIL_NET) OSIL_NET.onShoot();
   boarShot(G_.dmg); window.__shotT=performance.now(); botShot(G_.dmg);
   hitBuildingRay(sl.k, 220);
   wearTool(sl.k,1);
@@ -1970,6 +1986,7 @@ const TOOL_POSE = {
   pickaxe: { pos:new THREE.Vector3( 0.30,-0.34,-0.52), rot:new THREE.Euler(-0.10,-0.06, 0.03) },
   hammer:  { pos:new THREE.Vector3( 0.26,-0.34,-0.55), rot:new THREE.Euler(-0.10, 0.55, 0.00) },   // повёрнута на 90° вправо (крен по часовой)
   spear:   { pos:new THREE.Vector3( 0.30,-0.36,-0.50), rot:new THREE.Euler(-1.00,-0.10, 0.06) },
+  knife:   { pos:new THREE.Vector3( 0.24,-0.30,-0.44), rot:new THREE.Euler(-1.15, 0.10,-0.10) },
   rifle:   { pos:new THREE.Vector3( 0.14,-0.19,-0.36), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
   berdanka:{ pos:new THREE.Vector3( 0.14,-0.20,-0.40), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
   smg:     { pos:new THREE.Vector3( 0.14,-0.19,-0.38), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
@@ -1983,6 +2000,8 @@ let toolKind = 'none';
 
 /* ---- Тайминги (как в Rust: замах → удар → отдача; между ударами — кулдаун) ---- */
 const SWING_DUR = 0.88;   // полная длительность удара = кулдаун между ударами, с
+const SWING_KNIFE = 0.46;   // нож бьёт быстрее остальных
+const curSwingDur = ()=> toolKind==='knife' ? SWING_KNIFE : SWING_DUR;
 const HIT_AT    = 0.57;   // на какой доле анимации удар «попадает» в цель
 const EQUIP_DUR = 0.60;   // доставание предмета из-за нижнего края экрана
 let swingT = 0, swinging = false, swingHitFn = null;
@@ -2042,6 +2061,7 @@ function setToolMesh(kind){
   else if(kind==='rpg') mesh = toolCache.rpg || (toolCache.rpg = OSIL_TOOLS.makeRPG(true));
   else if(kind==='hammer') mesh = toolCache.hammer || (toolCache.hammer = makeHammerModel());
   else if(kind==='spear') mesh = toolCache.spear || (toolCache.spear = OSIL_TOOLS.makeSpear());
+  else if(kind==='knife') mesh = toolCache.knife || (toolCache.knife = OSIL_TOOLS.makeKnife());
   else if(kind==='berdanka') mesh = toolCache.berdanka || (toolCache.berdanka = OSIL_TOOLS.makeBerdanka(true));
   else if(kind==='smg') mesh = toolCache.smg || (toolCache.smg = OSIL_TOOLS.makeSMG(true));
   else if(kind==='pistol') mesh = toolCache.pistol || (toolCache.pistol = OSIL_TOOLS.makePistol(true));
@@ -2114,13 +2134,14 @@ function updateViewmodel(dt){
   if(toolKind==='rpg' && rpgKick > 0){ rpgKick = Math.max(0, rpgKick - dt*3.2); const q = rpgKick*rpgKick; dz += 0.10*q; dy += 0.02*q; rx += 0.20*q; }
   if(swinging){
     const prevT = swingT;
-    swingT += dt/SWING_DUR;
+    swingT += dt/curSwingDur();
     if(swingHitFn && swingT >= HIT_AT){ const f = swingHitFn; swingHitFn = null; f(); }
     if(prevT < HIT_AT && swingT >= HIT_AT) hitNow = true;
     if(swingT >= 1){ swinging = false; swingT = 0; }
     else {
       const s = sampleSwing(swingT);
       if(toolKind==='spear'){ dx+=s[0]*0.4; dy+=s[1]*0.3; dz+=s[2]*3.2; rx+=s[3]*0.25; ry+=s[4]*0.5; rz+=s[5]*0.4; }   // выпад вперёд
+      else if(toolKind==='knife'){ dx+=s[0]*0.9; dy+=s[1]*0.7; dz+=s[2]*1.7; rx+=s[3]*0.55; ry+=s[4]*1.3; rz+=s[5]*1.6; }
       else if(toolKind==='rock'){ dy+=s[1]*1.8; dz+=s[2]*1.2; rx+=s[3]*1.1; }   // двумя руками: замах над головой по центру и удар сверху вниз
       else { dx+=s[0]; dy+=s[1]; dz+=s[2]; rx+=s[3]; ry+=s[4]; rz+=s[5]; }
     }
@@ -2238,6 +2259,7 @@ const ITEM_DEFS = {
   axe:     {name:'Каменный топор',icon:TEXTURES.icon_axe,     stack:1, kind:'tool', maxDur:150},
   pickaxe: {name:'Каменная кирка',icon:TEXTURES.icon_pickaxe, stack:1, kind:'tool', maxDur:150},
   spear:   {name:'Копьё',         icon:TEXTURES.icon_spear,   stack:1, kind:'tool', maxDur:120},
+  knife:   {name:'Боевой нож', icon:TEXTURES.icon_knife, stack:1, kind:'tool', maxDur:200},
   rifle:   {name:'Штурмовая винтовка',icon:TEXTURES.icon_rifle, stack:1, kind:'gun', maxDur:400},
   berdanka:{name:'Полуавтоматическая винтовка',icon:TEXTURES.icon_berdanka, stack:1, kind:'gun', maxDur:350},
   smg:     {name:'Пистолет-пулемёт',icon:TEXTURES.icon_smg, stack:1, kind:'gun', maxDur:320},
@@ -2547,7 +2569,7 @@ const BUILD_ORDER = ['foundation','wall','shootwall','doorway','floor','stairs',
 const PLACE_HELD = {mdoor:1, door:1, cupboard:1, box:1, quarry:1, furnace:1};       // ставятся из рук, а не из меню плана
 const PART_MAX = {furnace:150, quarry:300, shootwall:200, parapet:150, stairs:150, foundation:250, floor:200, wall:200, doorway:200, door:200, mdoor:450, cupboard:150, box:150};
 const PART_NAME = {furnace:'Печка', quarry:'Карьер', shootwall:'Бойница', parapet:'Бруствер', stairs:'Лестница', foundation:'Фундамент', floor:'Пол', wall:'Стена', doorway:'Проём', door:'Дверь', mdoor:'Железная дверь', cupboard:'Шкаф', box:'Ящик'};
-const WEAPON_DMG = {rock:10, rifle:20, pistol:25, berdanka:35, smg:18, axe:15, pickaxe:12, spear:25};
+const WEAPON_DMG = {rock:10, rifle:20, pistol:25, berdanka:35, smg:18, axe:15, pickaxe:12, spear:25, knife:28};
 const BUILD_DMG_K = 0.1;        // по постройкам оружие бьёт в 10 раз слабее, чем по человеку
 const CUP_R = 30, DECAY_MIN = 180;   // шкаф защищает от гниения в радиусе 30 м; без шкафа деталь гниёт целиком за 3 часа
 
@@ -2569,6 +2591,7 @@ const CRAFT_RECIPES = [
   { id:'axe',     cat:'tools', name:'Каменный топор', desc:'Хорошо рубит деревья. Каждый крафт даёт новый топор.', icon:ITEM_DEFS.axe.icon,     time:5,  cost:{wood:30},            give:{tool:'axe'} },
   { id:'pickaxe', cat:'tools', name:'Каменная кирка', desc:'Добывает камень, железную и серную руду (руду плавят в печке).',          icon:ITEM_DEFS.pickaxe.icon, time:5,  cost:{wood:20,stone:20},   give:{tool:'pickaxe'} },
   { id:'spear',   cat:'weapons', name:'Копьё',        desc:'Простое оружие ближнего боя.',            icon:ITEM_DEFS.spear.icon,   time:8,  cost:{wood:40,stone:15},   give:{tool:'spear'} },
+  { id:'knife',   cat:'weapons', name:'Боевой нож',   desc:'Быстрое оружие ближнего боя: 28 урона, удары вдвое чаще копья.', icon:ITEM_DEFS.knife.icon, time:6, cost:{metal:30,wood:10}, give:{tool:'knife'} },
   { id:'rifle',  cat:'weapons', name:'Штурмовая винтовка', desc:'Автоматическая винтовка. Зажмите «Удар» для стрельбы. Нужны винтовочные патроны.', icon:ITEM_DEFS.rifle.icon, time:25, cost:{metal:120,pipe:2,gear:2,wood:60}, give:{tool:'rifle'} },
   { id:'berdanka', cat:'weapons', name:'Полуавтоматическая винтовка', desc:'Полуавтоматическая винтовка. Магазин 15, винтовочные патроны, урон 35, в голову ×2.', icon:ITEM_DEFS.berdanka.icon, time:30, cost:{metal:150,pipe:3,gear:3,wood:80}, give:{tool:'berdanka'} },
   { id:'satchel', cat:'weapons', name:'Сатчел-заряд', desc:'Бросьте в стену или дверь: прилипнет, 10 писков, затем взрыв — 75 урона детали.', icon:ITEM_DEFS.satchel.icon, time:40, cost:{cloth:80,gunpowder:25,metal:100,pipe:2,gear:1}, give:{item:'satchel', amount:1} },
@@ -2630,9 +2653,9 @@ function repairTarget(itemKey){
   return sl.d < TOOL_MAX_DUR[itemKey] ? sl : 'full';
 }
 /* реальное время крафта (секунды на 1 партию), как в Rust */
-const CRAFT_CAT_MAP = {axe:'tools',pickaxe:'tools',hammer:'tools',spear:'weapons',rifle:'weapons',berdanka:'weapons',smg:'weapons',pistol:'weapons',satchel:'weapons',grenade:'weapons',rpg:'weapons',holo_sight:'weapons',ammo_pistol:'ammo',ammo_rifle:'ammo',rocket:'ammo',gunpowder:'ammo',eod_suit:'armor',nails:'comp',sheet:'comp',gear:'comp',pipe:'comp',fuel:'comp',plan:'build',door:'build',mdoor:'build',cupboard:'build',box:'build',furnace:'mech',quarry:'mech',copter:'mech'};
+const CRAFT_CAT_MAP = {axe:'tools',pickaxe:'tools',hammer:'tools',spear:'weapons',knife:'weapons',rifle:'weapons',berdanka:'weapons',smg:'weapons',pistol:'weapons',satchel:'weapons',grenade:'weapons',rpg:'weapons',holo_sight:'weapons',ammo_pistol:'ammo',ammo_rifle:'ammo',rocket:'ammo',gunpowder:'ammo',eod_suit:'armor',nails:'comp',sheet:'comp',gear:'comp',pipe:'comp',fuel:'comp',plan:'build',door:'build',mdoor:'build',cupboard:'build',box:'build',furnace:'mech',quarry:'mech',copter:'mech'};
 CRAFT_RECIPES.forEach(r=>{ if(CRAFT_CAT_MAP[r.id]) r.cat = CRAFT_CAT_MAP[r.id]; });
-const CRAFT_TIME = {axe:4,pickaxe:4,spear:5,rifle:24,berdanka:20,satchel:12,smg:16,pistol:12,ammo_pistol:2,ammo_rifle:3,gunpowder:4,nails:2,sheet:2,gear:6,pipe:3,fuel:2,eod_suit:36,holo_sight:9,hammer:4,mdoor:9,door:4,cupboard:8,box:3,plan:2,copter:24,grenade:4,quarry:12,furnace:6,rpg:40,rocket:10};
+const CRAFT_TIME = {axe:4,pickaxe:4,spear:5,knife:6,rifle:24,berdanka:20,satchel:12,smg:16,pistol:12,ammo_pistol:2,ammo_rifle:3,gunpowder:4,nails:2,sheet:2,gear:6,pipe:3,fuel:2,eod_suit:36,holo_sight:9,hammer:4,mdoor:9,door:4,cupboard:8,box:3,plan:2,copter:24,grenade:4,quarry:12,furnace:6,rpg:40,rocket:10};
 CRAFT_RECIPES.forEach(r=>{ if(CRAFT_TIME[r.id]) r.time = CRAFT_TIME[r.id]; });
 /* очередь: не больше 3 РАЗНЫХ предметов одновременно; ресурсы списываются при постановке, партии делаются по одной */
 const craftQueue = [], CRAFT_Q_MAX = 3;
@@ -3157,7 +3180,7 @@ function hitBuildingRay(w, range){
   aimRay(range);
   const hit = _bRay.intersectObjects(partMeshes, false)[0]; if(!hit) return false;
   const id = hit.object.userData.partId, p = parts.get(id); if(!p) return false;
-  lastHitPoint.copy(hit.point); spawnDebris(hit.point, 'wood', 4, 0.7);
+  lastHitPoint.copy(hit.point); hitFx(hit.point, 'wood');
   if(range < 10) OSIL_AUDIO.play('chop');
   p.hitT = performance.now();
   if(window.OSIL_NET && OSIL_NET.on) OSIL_NET.onBuild({t:'bh', id, w});
@@ -3920,6 +3943,7 @@ for(let i=0;i<DEBRIS_MAX;i++){
   scene.add(m); debrisPool.push(m);
 }
 let debrisIdx = 0;
+function hitFx(p, ty){ spawnDebris(p, ty, 9, 0.95); if(window.OSIL_NET && OSIL_NET.on) OSIL_NET.fxHit(p, ty); }
 function spawnDebris(pos, type, count, power){
   if(!CFG.particles) return;
   const cols = DEBRIS_COLORS[type] || DEBRIS_COLORS.stone;
@@ -3927,7 +3951,7 @@ function spawnDebris(pos, type, count, power){
   for(let i=0;i<count;i++){
     const m = debrisPool[debrisIdx++ % DEBRIS_MAX], u = m.userData;
     m.material.color.setHex(cols[(Math.random()*cols.length)|0]);
-    const sz = 0.018+Math.random()*0.032;
+    const sz = 0.034+Math.random()*0.055;
     if(isWood && type==='wood') m.scale.set(sz*0.5, sz*0.5, sz*(2+Math.random()*2));   // щепки вытянутые
     else if(type==='cloth') m.scale.set(sz*1.6, sz*0.2, sz*1.6);                      // листья
     else m.scale.set(sz, sz*(0.6+Math.random()*0.6), sz);
@@ -3938,6 +3962,11 @@ function spawnDebris(pos, type, count, power){
     u.g = type==='cloth' ? 5 : 14;
     u.max = u.life = 0.7+Math.random()*0.7;
     m.visible = true;
+  }
+  if(count >= 4){
+    const hard = (type==='stone'||type==='metal'||type==='sulfur'||type==='scrap');
+    for(let i=0;i<2;i++) fxEmit('smoke', pos.clone(), new THREE.Vector3((Math.random()-.5)*0.7,0.3+Math.random()*0.5,(Math.random()-.5)*0.7), 0.6, 0.12, 0.5, 0xb8ad94, 0xd8d0bd, {drag:1.5, a:0.45});
+    if(hard) for(let i=0;i<4;i++) fxEmit('spark', pos.clone(), new THREE.Vector3((Math.random()-.5)*3.2,0.8+Math.random()*2.2,(Math.random()-.5)*3.2), 0.28, 0.07, 0.02, 0xffe08a, 0xff8a30, {g:9, a:1});
   }
 }
 function updateDebris(dt){
@@ -3967,12 +3996,12 @@ for(let i=0;i<IMP_MAX;i++){
 let impIdx = 0;
 function impactBurst(pos, dist, cols, big){
   const k = 1 + Math.min(dist, 300)*0.02;                    // издалека частицы крупнее, чтобы были заметны
-  const n = big ? 12 : 9;
+  const n = big ? 17 : 13;
   for(let i=0;i<n;i++){
     const m = impPool[impIdx++ % IMP_MAX], u = m.userData, dust = i < 3;
     m.material.color.setHex(dust ? 0xbdb59a : cols[(Math.random()*cols.length)|0]);
     m.material.opacity = dust ? 0.55 : 1;
-    u.dust = dust; u.s = (dust ? 0.16 : 0.03+Math.random()*0.03) * k;
+    u.dust = dust; u.s = (dust ? 0.30 : 0.055+Math.random()*0.05) * k;
     m.scale.setScalar(u.s);
     m.position.copy(pos).add(_ip.set((Math.random()-.5)*0.1, 0.03, (Math.random()-.5)*0.1));
     const sp = (dust ? 0.5 : 1.2+Math.random()*1.6);
@@ -3982,6 +4011,8 @@ function impactBurst(pos, dist, cols, big){
     u.max = u.life = dust ? 0.9 : 0.6+Math.random()*0.5;
     m.visible = true;
   }
+  fxEmit('smoke', pos.clone(), new THREE.Vector3(0,0.5,0), 0.55, 0.1*k, 0.5*k, 0xb8ad94, 0xd8d0bd, {drag:1.5, a:0.4});
+  if(big) for(let i=0;i<3;i++) fxEmit('spark', pos.clone(), new THREE.Vector3((Math.random()-.5)*3,1+Math.random()*2,(Math.random()-.5)*3), 0.25, 0.07*k, 0.02, 0xffe08a, 0xff8a30, {g:9, a:1});
 }
 
 /* ---- всплески и пузыри при стрельбе по воде ---- */
@@ -4038,7 +4069,7 @@ function updateSplash(dt){
 }
 const _wp = new THREE.Vector3();
 function shotImpact(){
-  if(!CFG.particles) return;
+  window.__shotEnd = null; window.__shotMat = '';
   if(CFG.camMode|0){
     const cp = Math.cos(player.pitch);
     _io.set(player.pos.x, player.pos.y+player.height, player.pos.z); _id.set(-Math.sin(player.yaw)*cp, Math.sin(player.pitch), -Math.cos(player.yaw)*cp);
@@ -4064,12 +4095,13 @@ function shotImpact(){
     const tw = (SEA_Y-_io.y)/_id.y;
     if(tw > 0.3 && tw < best){
       const wx = _io.x+_id.x*tw, wz = _io.z+_id.z*tw;
-      if(isWaterAt(wx, wz)){ _wp.set(wx, SEA_Y, wz); lastHitPoint.copy(_wp); waterSplash(_wp, tw); return; }
+      if(isWaterAt(wx, wz)){ _wp.set(wx, SEA_Y, wz); lastHitPoint.copy(_wp); window.__shotEnd = _wp.clone(); window.__shotMat = 'x'; if(CFG.particles) waterSplash(_wp, tw); return; }
     }
   }
-  if(!hitPt) return;
+  if(!hitPt){ window.__shotEnd = _io.clone().addScaledVector(_id, 150); return; }
   lastHitPoint.copy(hitPt);
-  impactBurst(hitPt, best, cols, cols !== IMP_GROUND);
+  window.__shotEnd = hitPt.clone(); window.__shotMat = cols===IMP_GROUND ? 'g' : (Object.keys(DEBRIS_COLORS).find(k=>DEBRIS_COLORS[k]===cols) || 'stone');
+  if(CFG.particles) impactBurst(hitPt, best, cols, cols !== IMP_GROUND);
 }
 function updateImpacts(dt){
   updateSplash(dt);
@@ -4124,14 +4156,14 @@ function harvestOnce(target){
   if(target.type==='scrap'){ triggerSwing(); hitBarrel(target); return; }
   triggerSwing();
   window.OSIL_AUDIO&&OSIL_AUDIO.play(target.type==='wood'?'chop':(target.type==='cloth'?'hit_tree':'hit_stone'));
-  if(window.OSIL_NET && OSIL_NET.on && target.nid!=null){ spawnDebris(lastHitPoint, target.type, 4, 0.8); OSIL_NET.harvest(target, toolKind, false); return; }
+  if(window.OSIL_NET && OSIL_NET.on && target.nid!=null){ hitFx(lastHitPoint, target.type); OSIL_NET.harvest(target, toolKind, false); return; }
   const mult = toolMultiplier(target), dep = isDepNode(target);
   const take = dep ? nodeTake(target) : 0;
   const finalAmount = dep ? Math.max(1, Math.floor(take*mult)) : Math.max(1, Math.floor((target.giveMin + Math.random()*(target.giveMax-target.giveMin))*mult));
   giveItem(ORE_ITEM[target.type]||target.type, finalAmount); notifyGain(ORE_ITEM[target.type]||target.type, finalAmount);
   target.health -= dep ? take : 30*Math.max(0.6, mult);
   if(window.OSIL_NET) OSIL_NET.onHit(target);
-  spawnDebris(lastHitPoint, target.type, 4, 0.8);
+  hitFx(lastHitPoint, target.type);
   updateResourceUI();
   if(target.health <= 0){
     debrisAtTarget(target);
@@ -4245,7 +4277,7 @@ function doHit(fromHold){
   if(hitCooldown>0 || swinging || equipT<1) return;
   if(window.OSIL_NET) OSIL_NET.melee();
   const _hk = toolKind;
-  hitCooldown = SWING_DUR;
+  hitCooldown = curSwingDur();
   swingHitFn = ()=>{ hitBuildingRay(_hk, 3.3); applyToolHit(); };
   triggerSwing();
 }
@@ -4291,7 +4323,7 @@ function applyToolHit(){
   if(window.OSIL_NET && OSIL_NET.on && target.nid!=null){        // онлайн: количество, урон узлу и лут считает сервер
     const mult = toolMultiplier(target);
     OSIL_AUDIO.play(target.type==='wood' ? 'chop' : (target.type==='cloth' ? 'hit_tree' : 'hit_stone'));
-    camKick = 0.035; spawnDebris(lastHitPoint, target.type, 4, 0.8);
+    camKick = 0.035; hitFx(lastHitPoint, target.type);
     OSIL_NET.harvest(target, kind, false);
     wearTool(kind, mult>=1 ? 1 : 2); return;
   }
@@ -4303,7 +4335,7 @@ function applyToolHit(){
   target.health -= dep ? take : 20*Math.max(0.6, mult);
   OSIL_AUDIO.play(target.type==='wood' ? 'chop' : (target.type==='cloth' ? 'hit_tree' : 'hit_stone'), target.type==='scrap'?{rate:1.4}:undefined);
   camKick = 0.035;
-  spawnDebris(lastHitPoint, target.type, 4, 0.8);
+  hitFx(lastHitPoint, target.type);
   if(target.health <= 0){ debrisAtTarget(target); destroyHarvestable(target, true); }
   wearTool(kind, mult>=1 ? 1 : 2);      // неподходящим инструментом изнашивается вдвое быстрее
 }
@@ -4371,10 +4403,10 @@ function itemCount(key){ return countItem(key); }
 
 function toolKindForItem(slot){
   const k = slot && slot.k;
-  if(k==='rock' || k==='axe' || k==='pickaxe' || k==='rifle' || k==='pistol' || k==='berdanka' || k==='smg' || k==='spear' || k==='hammer' || k==='satchel' || k==='grenade' || k==='rpg') return k;
+  if(k==='rock' || k==='axe' || k==='pickaxe' || k==='rifle' || k==='pistol' || k==='berdanka' || k==='smg' || k==='spear' || k==='knife' || k==='hammer' || k==='satchel' || k==='grenade' || k==='rpg') return k;
   return 'none';
 }
-function hasToolInHand(){ return toolKind==='rock' || toolKind==='axe' || toolKind==='pickaxe' || toolKind==='spear' || toolKind==='hammer'; }
+function hasToolInHand(){ return toolKind==='rock' || toolKind==='axe' || toolKind==='pickaxe' || toolKind==='spear' || toolKind==='knife' || toolKind==='hammer'; }
 function heldSlot(){ return hotbarSlots[selectedSlot]; }
 
 /* Перемещение: пустая цель — перенос; тот же предмет и он стакается — слияние до лимита
@@ -5461,7 +5493,7 @@ function boarShot(dmg){
 function boarMelee(kind){
   if(!boars.length) return false;
   bzAim(); const h=boarTrace(_bo,_bd,3.4); if(!h) return false;
-  const D={axe:34,pickaxe:26,spear:46,rock:15}, d=D[kind]||18;
+  const D={axe:34,pickaxe:26,spear:46,knife:30,rock:15}, d=D[kind]||18;
   try{ OSIL_AUDIO.play('hit_tree',{rate:0.55}); }catch(e){}
   camKick=0.04;
   boarHit(h.b, h.head?d*1.5:d, _bo.x+_bd.x*h.t, _bo.y+_bd.y*h.t, _bo.z+_bd.z*h.t, _bd, h.head);
@@ -5714,7 +5746,7 @@ function makeBot(x,z){
   m.armR.sh.rotation.x=-1.45; m.armL.sh.rotation.x=-1.3; m.armL.sh.rotation.y=0.35;
   const gm=_lm(0x1b1b1d), gun=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.12,0.75),gm); gun.position.set(-0.04,-0.3,-0.25); m.armR.hold.add(gun);
   const gy=heightAt(x,z); m.root.position.set(x,gy,z); scene.add(m.root);
-  const b={rig:m,hp:100,dead:false,deadT:0,yaw:Math.PI,cd:0.6,burst:0,los:false,losT:0,aggroT:0,x,z,hx:x,hz:z};
+  const b={rig:m,hp:60,dead:false,deadT:0,yaw:Math.PI,cd:0.6,burst:0,los:false,losT:0,aggroT:0,x,z,hx:x,hz:z,wt:Math.random()*3,wk:false,ph:0,sd:Math.random()<0.5?1:-1};
   bots.push(b); return b;
 }
 /* Агропром — сотни отдельных мешей (каждый draw call + проход теней). Склеиваем всё статичное по материалам в несколько мешей. */
@@ -5897,11 +5929,11 @@ function botShot(dmg){
 function botFire(b){
   const y=heightAt(b.x,b.z), ox=b.x-Math.sin(b.yaw+Math.PI)*0.6, oy=y+1.35, oz=b.z-Math.cos(b.yaw+Math.PI)*0.6;
   const tx=player.pos.x, ty=player.pos.y+1.1, tz=player.pos.z, dx=tx-ox, dy=ty-oy, dz=tz-oz, L=Math.hypot(dx,dy,dz), hl=Math.max(0.01,Math.hypot(dx,dz));
-  const sp=0.06, ex=(Math.random()*2-1)*sp*L, ey=(Math.random()*2-1)*sp*L, px=-dz/hl, pz=dx/hl;
+  const sp=0.11, ex=(Math.random()*2-1)*sp*L, ey=(Math.random()*2-1)*sp*L, px=-dz/hl, pz=dx/hl;
   const ax=tx+px*ex, ay=ty+ey, az=tz+pz*ex;
   const clear = !segBlocked(b.x,y+1.4,b.z,ox,oy,oz) && !segBlocked(ox,oy,oz,ax,ay,az) && !segBlocked(b.x,y+1.0,b.z,tx,ty,tz);
   if(!clear) return;   // стена на пути — не стреляет (ни урона, ни трассера)
-  if(Math.hypot(ex,ey)<0.55){ bzHurtPlayer(5+Math.random()*3); camKick=0.05; }
+  if(Math.hypot(ex,ey)<0.42){ bzHurtPlayer(2+Math.random()*2); camKick=0.05; }
   let ln=_trPool.pop();
   if(!ln){ ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),botTrMat); ln.frustumCulled=false; }
   const pa=ln.geometry.attributes.position; pa.setXYZ(0,ox,oy,oz); pa.setXYZ(1,ox+(ax-ox)*1.15,oy+(ay-oy)*1.15,oz+(az-oz)*1.15); pa.needsUpdate=true;
@@ -5927,19 +5959,31 @@ function updateRoadWorld(dt){
     if(!b.dead&&Math.abs(b.x-player.pos.x)+Math.abs(b.z-player.pos.z)>140){ m.root.visible=false; continue; } m.root.visible=true;
     { const far=Math.abs(b.x-player.pos.x)+Math.abs(b.z-player.pos.z)>70; if(far!==b._far){ b._far=far; m.root.traverse(o=>{ if(o.isMesh) o.castShadow=!far; }); shadowDirty=true; } }
     if(b.dead){ b.deadT+=dt; const k=Math.min(1,b.deadT/0.5); m.root.rotation.x=-1.5*k; m.root.position.y=gy+0.15*k;
-      if(b.deadT>60){ b.dead=false; b.hp=100; m.root.rotation.x=0; b.aggroT=0; m.root.position.y=gy; } continue; }
+      if(b.deadT>60){ b.dead=false; b.hp=60; b.x=b.hx; b.z=b.hz; m.root.rotation.x=0; b.aggroT=0; m.root.position.y=gy; } continue; }
     b.aggroT=Math.max(0,b.aggroT-dt);
     const dx=player.pos.x-b.x, dz=player.pos.z-b.z, dist=Math.hypot(dx,dz), alive=player.hp>0;
     const prov=b.aggroT>0||(performance.now()-(window.__shotT||0)<6000&&dist<50);
-    const range=prov?28:18;                                        // далеко — не стреляет
+    const range=prov?22:14;                                        // далеко — не стреляет
     b.losT-=dt; if(b.losT<=0){ b.losT=0.2+Math.random()*0.1; b.los=alive&&dist<range&&botSee(b); }
-    let want=b.yaw; if(alive&&(b.los||(prov&&dist<range))) want=Math.atan2(dx,dz);
+    const engaged=alive&&b.los&&dist<range; let mvx=0,mvz=0,spd=0;
+    if(engaged){ if(dist>13){ mvx=dx/dist; mvz=dz/dist; spd=1.7; } else if(dist<7){ mvx=-dx/dist; mvz=-dz/dist; spd=1.4; } else { if(Math.random()<dt*0.25) b.sd=-b.sd; mvx=-dz/dist*b.sd; mvz=dx/dist*b.sd; spd=1.0; } }
+    else if(prov&&alive&&dist<45&&dist>9){ mvx=dx/dist; mvz=dz/dist; spd=1.9; }
+    else { b.wt-=dt;
+      if(b.wt<=0){ if(b.wk){ b.wk=false; b.wt=2+Math.random()*4; } else { const a=Math.random()*6.283, r=3+Math.random()*11; b.tx=b.hx+Math.cos(a)*r; b.tz=b.hz+Math.sin(a)*r; b.wk=true; b.wt=9; } }
+      if(b.wk){ const ex=b.tx-b.x, ez=b.tz-b.z, d2=Math.hypot(ex,ez); if(d2<0.7){ b.wk=false; b.wt=2+Math.random()*4; } else { mvx=ex/d2; mvz=ez/d2; spd=1.25; } } }
+    if(spd>0){ const nx=b.x+mvx*spd*dt, nz=b.z+mvz*spd*dt, h0=heightAt(nx,nz);
+      if(!isWaterAt(nx,nz) && Math.abs(h0-gy)<0.6 && Math.hypot(nx-b.hx,nz-b.hz)<48 && !segBlocked(b.x,gy+0.6,b.z,nx+mvx*0.6,gy+0.6,nz+mvz*0.6)){ b.x=nx; b.z=nz; }
+      else { spd=0; if(!engaged){ b.wk=false; b.wt=0.6; } } }
+    const gy2=heightAt(b.x,b.z);
+    let want=b.yaw; if(engaged||(alive&&prov&&dist<range)) want=Math.atan2(dx,dz); else if(spd>0) want=Math.atan2(mvx,mvz);
     let da=want-b.yaw; da=Math.atan2(Math.sin(da),Math.cos(da)); b.yaw+=bzC(da,-dt*6,dt*6);
-    m.root.rotation.y=b.yaw+Math.PI; m.root.position.set(b.x,gy+Math.sin(performance.now()/700+b.hx)*0.004,b.z);
+    b.ph+=dt*spd*3.4; { const sw=Math.sin(b.ph)*Math.min(1,spd/1.3)*0.75; m.legL.hip.rotation.x=sw; m.legR.hip.rotation.x=-sw; m.legL.knee.rotation.x=-Math.max(0,-sw)*0.9; m.legR.knee.rotation.x=-Math.max(0,sw)*0.9; }
+    m.root.rotation.y=b.yaw+Math.PI; m.root.position.set(b.x,gy2+Math.sin(performance.now()/700+b.hx)*0.004,b.z);
+    if(b.los&&!b._seen){ b._seen=true; b.cd=Math.max(b.cd,1.0+Math.random()*0.6); } else if(!b.los) b._seen=false;
     b.cd-=dt;
     if(b.mag===undefined){ b.mag=15; b.rl=0; }
     if(b.rl>0){ b.rl-=dt; if(b.rl<=0) b.mag=15; }
-    else if(b.los&&dist<range&&Math.abs(da)<0.2&&b.cd<=0){ botFire(b); b.mag--; b.burst++; if(b.mag<=0){ b.rl=3.5; b.burst=0; b.cd=0.5; } else if(b.burst>=3){ b.burst=0; b.cd=0.9+Math.random()*0.6; } else b.cd=0.22; }
+    else if(b.los&&dist<range&&Math.abs(da)<0.2&&b.cd<=0){ botFire(b); b.mag--; b.burst++; if(b.mag<=0){ b.rl=5; b.burst=0; b.cd=0.8; } else if(b.burst>=2){ b.burst=0; b.cd=1.7+Math.random()*1.3; } else b.cd=0.4; }
   }
 }
 function takeLoot(){
@@ -6190,7 +6234,7 @@ function updateCopterFX(dt){
   if(HELI.n){ heliTick(c.spool,c.thr,c.pilot,Math.hypot(player.pos.x-c.x,player.pos.z-c.z)); if(!c.pilot&&c.spool<=0.01) copterAudio(false); }
   const near=!c.pilot&&player.hp>0&&Math.hypot(player.pos.x-c.x,player.pos.z-c.z)<3.4&&Math.abs(player.pos.y-c.y)<3&&!panelsOpen();
   c.near=near;
-  if(!c.btn){ const bt=document.createElement('button'); bt.id='copter-btn'; bt.style.cssText='position:fixed;z-index:9;display:none;padding:10px 18px;border-radius:12px;border:2px solid rgba(255,255,255,.75);background:rgba(20,24,18,.82);color:#fff;font:bold 15px sans-serif;letter-spacing:.5px;transform:translate(-50%,-100%);touch-action:manipulation';
+  if(!c.btn){ const bt=document.createElement('button'); bt.id='copter-btn'; bt.style.cssText='position:fixed;z-index:9;display:none;padding:10px 16px;border:none;border-radius:0;background:rgba(34,33,31,.82);color:#fff;font:600 12px/1 var(--rf,sans-serif);letter-spacing:.8px;text-transform:uppercase;transform:translate(-50%,-100%);touch-action:manipulation';
     ['pointerdown'].forEach(ev=>bt.addEventListener(ev,e=>{ e.preventDefault(); e.stopPropagation(); copterTake(); })); document.body.appendChild(bt); c.btn=bt; }
   const show=(near||c.pilot)&&!document.body.classList.contains('ui-open');
   if(show){ const hb=document.getElementById('hotbar'), r=hb?hb.getBoundingClientRect():{right:window.innerWidth*0.7,top:window.innerHeight-70};
@@ -6501,7 +6545,7 @@ window.OSIL_NET = (function(){
   const TOK = (()=>{ try{ let t = localStorage.getItem('anode_tok'); if(!t){ t = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('anode_tok', t); } return t; }catch(e){ return 'anon' + Math.random().toString(36).slice(2); } })();
   let ws = null, on = false, myId = 0, srvName = '', applying = false, sendT = 0, meleeT = 0, dieSent = false;
   const remotes = new Map();
-  const TOOLS = {rock:7, none:0, axe:1, pickaxe:2, rifle:3, spear:4, pistol:5, berdanka:6, smg:8}, TOOLN = ['none','axe','pickaxe','rifle','spear','pistol','berdanka','rock','smg'];
+  const TOOLS = {rock:7, none:0, axe:1, pickaxe:2, rifle:3, spear:4, pistol:5, berdanka:6, smg:8, rpg:9, grenade:10, satchel:11, knife:12, hammer:13}, TOOLN = ['none','axe','pickaxe','rifle','spear','pistol','berdanka','rock','smg','rpg','grenade','satchel','knife','hammer'];
 
   const toast = m => { try{ showToast(m); }catch(e){} };
   const send = o => { if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); };
@@ -6646,9 +6690,9 @@ window.OSIL_NET = (function(){
             spawnDebris(t.mesh.position.clone().setY(t.mesh.position.y+1), t.type, 6, 0.8); destroyHarvestable(t, true); } finally{ applying = false; } } break; }
       case 'hh': { const t = byNid(m.i); if(t) t.health = m.h; break; }
       case 'bd': case 'dr': case 'dl': case 'dok': case 'dno': applyBuild(m); break;
-      case 'sxp': spawnSatchel(m.id, m.p, m.q, true); break;
-      case 'rxp': satchelExplode({p:new THREE.Vector3(m.p[0],m.p[1],m.p[2]), n:new THREE.Vector3(0,1,0), pid:0, net:true, rocket:true, big:1.35, dmg:120, R:5}); break;
-      case 'gxp': satchelExplode({p:new THREE.Vector3(m.p[0],m.p[1],m.p[2]), n:new THREE.Vector3(0,1,0), pid:0, net:true, grenade:true, big:0.85}); break;
+      case 'sxp': dropProj('sa', new THREE.Vector3(m.p[0],m.p[1],m.p[2])); spawnSatchel(m.id, m.p, m.q, true); break;
+      case 'rxp': dropProj('rk', new THREE.Vector3(m.p[0],m.p[1],m.p[2])); satchelExplode({p:new THREE.Vector3(m.p[0],m.p[1],m.p[2]), n:new THREE.Vector3(0,1,0), pid:0, net:true, rocket:true, big:1.35, dmg:120, R:5}); break;
+      case 'gxp': dropProj('gr', new THREE.Vector3(m.p[0],m.p[1],m.p[2])); satchelExplode({p:new THREE.Vector3(m.p[0],m.p[1],m.p[2]), n:new THREE.Vector3(0,1,0), pid:0, net:true, grenade:true, big:0.85}); break;
       case 'qa': quarActive.clear(); (m.ids||[]).forEach(i=>quarActive.add(i)); break;
       case 'qs': { const q = quarSt(m.id); q.f = m.f||0; q.stone = m.s||0; q.metal = m.m||0; q.sulfur = m.u||0; if(quarOpenId===m.id) updateQuarryText(); break; }
       case 'bhp': setPartHp(m.id, m.h); break;
@@ -6661,9 +6705,75 @@ window.OSIL_NET = (function(){
       case 'got': giveItem(m.k, m.n, m.d); refreshInvUI(); try{ updateResourceUI(); }catch(e){} if(m.srv){ if(m.c) try{ flashCrit(); }catch(e){} toast((m.c ? 'КРИТ! ' : '') + '+' + m.n + ' ' + (RES_NAMES[m.k] || (ITEM_DEFS[m.k] && ITEM_DEFS[m.k].name) || m.k)); } else toast((m.back ? 'Вернулось: ' : 'Получено: ') + (RES_NAMES[m.k] || m.k) + (m.n > 1 ? ' ' + m.n : '')); break;
       case 'sw': { const r = remotes.get(m.id); if(r) r.swing = 1; break; }
       case 'sh': { const r = remotes.get(m.id); if(r){ r.flash = 0.05;
-          const d = Math.hypot(r.p.x-player.pos.x, r.p.z-player.pos.z); OSIL_AUDIO.play('ak',{vol:Math.max(0.05, 0.8 - d/90)}); } break; }
+          const d = Math.hypot(r.p.x-player.pos.x, r.p.z-player.pos.z); OSIL_AUDIO.play('ak',{vol:Math.max(0.05, 0.8 - d/90)}); if(m.p) remoteShot(r, m.p, m.m); } break; }
       case 'dmg': hurt(m.d, m.from); break;
       case 'c': chat(m.n, m.m); break;
+      case 'fx': remoteFx(m); break;
+    }
+  }
+
+  /* ---------------- чужие выстрелы, ракеты, гранаты, частицы ---------------- */
+  const rtr = [], rproj = [], _vY = new THREE.Vector3(0,1,0);
+  const trGeo = new THREE.CylinderGeometry(0.014,0.014,1,5), trMat0 = new THREE.MeshBasicMaterial({color:0xfff0b0, transparent:true, opacity:0.8, depthWrite:false, fog:false});
+  function fx(k, o, d){ if(!on) return; send({t:'fx', k, o:[r2(o.x),r2(o.y),r2(o.z)], d:[r2(d.x),r2(d.y),r2(d.z)]}); }
+  let hpT = 0;
+  function fxHit(p, ty){ if(!on) return; const n = performance.now(); if(n-hpT < 120) return; hpT = n; send({t:'fx', k:'hp', o:[r2(p.x),r2(p.y),r2(p.z)], m:ty}); }
+  function remoteShot(r, p, mat){
+    const e = new THREE.Vector3(p[0],p[1],p[2]), s0 = new THREE.Vector3(r.p.x, r.p.y+1.4, r.p.z);
+    const dv = e.clone().sub(s0), L = dv.length(); if(!(L > 1) || L > 500) return; dv.multiplyScalar(1/L);
+    s0.addScaledVector(dv, 0.8);
+    const dl = Math.min(L-0.8, 90);
+    if(dl > 0.5){
+      const m = new THREE.Mesh(trGeo, trMat0.clone()); m.frustumCulled = false;
+      m.position.copy(s0).addScaledVector(dv, dl/2); m.quaternion.setFromUnitVectors(_vY, dv); m.scale.set(1, dl, 1); scene.add(m); rtr.push({m, t:0.07});
+    }
+    if(CFG.particles){
+      const dist = Math.max(1, Math.hypot(e.x-player.pos.x, e.z-player.pos.z));
+      if(mat === 'x') waterSplash(e, dist);
+      else { const g = !mat || mat === 'g'; impactBurst(e, dist, g ? IMP_GROUND : (DEBRIS_COLORS[mat] || DEBRIS_COLORS.stone), !g); }
+    }
+  }
+  function remoteFx(m){
+    if(!m || !m.o) return;
+    const o = new THREE.Vector3(m.o[0],m.o[1],m.o[2]), dist = Math.hypot(o.x-player.pos.x, o.z-player.pos.z);
+    if(m.k === 'hp'){ if(CFG.particles && DEBRIS_COLORS[m.m]) spawnDebris(o, m.m, 7, 0.9); return; }
+    if(!m.d) return;
+    const d = new THREE.Vector3(m.d[0],m.d[1],m.d[2]); if(d.lengthSq() < 1e-6) return; d.normalize();
+    if(m.k === 'rk'){
+      const mesh = makeRocketMesh(); mesh.position.copy(o); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1), d); scene.add(mesh);
+      rproj.push({k:'rk', m:mesh, v:d.clone().multiplyScalar(RPG_SPEED), t:0, tr:0});
+      try{ OSIL_AUDIO.play('ak', {vol:Math.max(0.1, 1-dist/120), rate:0.45}); }catch(e){}
+      fxEmit('fire', o.clone(), _vZero.clone(), 0.18, 0.4, 1.8, 0xffffff, 0xffd8a0, {a:0.9});
+      for(let i=0;i<5;i++) fxEmit('smoke', o.clone().addScaledVector(d,-0.4), new THREE.Vector3((Math.random()-.5)*1.2,(Math.random()-.5)*1.2,(Math.random()-.5)*1.2).addScaledVector(d,-2.5), 0.9, 0.3, 1.4, 0x8a857d, 0xcfcac2, {drag:1.8, a:0.55});
+    } else if(m.k === 'gr'){
+      const mesh = makeGrenadeMesh(); mesh.position.copy(o); scene.add(mesh);
+      rproj.push({k:'gr', m:mesh, v:d.clone().multiplyScalar(14).add(new THREE.Vector3(0,3.2,0)), t:0, spin:new THREE.Vector3(9,3,6)});
+    } else if(m.k === 'sa'){
+      const mesh = makeSatchelMesh(); mesh.scale.setScalar(0.85); mesh.position.copy(o); scene.add(mesh);
+      rproj.push({k:'sa', m:mesh, v:d.clone().multiplyScalar(11).add(new THREE.Vector3(0,2.4,0)), t:0, spin:new THREE.Vector3(6,2,4)});
+    }
+  }
+  function dropProj(k, p){
+    let bi = -1, bd = 30; rproj.forEach((r,i)=>{ if(r.k !== k) return; const dd = r.m.position.distanceTo(p); if(dd < bd){ bd = dd; bi = i; } });
+    if(bi >= 0){ scene.remove(rproj[bi].m); rproj.splice(bi,1); }
+  }
+  function animFx(dt){
+    for(let i=rtr.length-1;i>=0;i--){ const t = rtr[i]; t.t -= dt; if(t.t <= 0){ scene.remove(t.m); t.m.material.dispose(); rtr.splice(i,1); } else t.m.material.opacity = 0.8*(t.t/0.07); }
+    for(let i=rproj.length-1;i>=0;i--){
+      const r = rproj[i]; r.t += dt; const p = r.m.position;
+      if(r.k === 'rk'){
+        p.addScaledVector(r.v, dt);
+        r.tr -= dt; if(r.tr <= 0){ r.tr = 0.04;
+          fxEmit('smoke', p.clone(), new THREE.Vector3((Math.random()-.5)*.5,(Math.random()-.5)*.5+.2,(Math.random()-.5)*.5), 1.0, 0.25, 1.1, 0x8f8a82, 0xd8d4cc, {drag:1.5, a:0.5});
+          fxEmit('fire', p.clone(), _vZero.clone(), 0.12, 0.28, 0.08, 0xfff2c0, 0xff7a1a, {a:0.95}); }
+        if(r.t > 6 || p.y < heightAt(p.x,p.z)){ scene.remove(r.m); rproj.splice(i,1); }
+      } else {
+        r.v.y -= 9.8*dt; p.addScaledVector(r.v, dt);
+        r.m.rotation.x += r.spin.x*dt; r.m.rotation.y += r.spin.y*dt; r.m.rotation.z += r.spin.z*dt;
+        const gy = heightAt(p.x,p.z)+0.06;
+        if(p.y < gy){ p.y = gy; if(r.k === 'sa' || r.v.length() < 1.5){ r.v.set(0,0,0); r.spin.set(0,0,0); } else { r.v.y = Math.abs(r.v.y)*0.35; r.v.x *= 0.5; r.v.z *= 0.5; r.spin.multiplyScalar(0.5); } }
+        if(r.t > (r.k === 'gr' ? 6 : 4)){ scene.remove(r.m); rproj.splice(i,1); }
+      }
     }
   }
 
@@ -6680,8 +6790,9 @@ window.OSIL_NET = (function(){
   function raySphere(o, d, c, r){ const ox = o.x-c.x, oy = o.y-c.y, oz = o.z-c.z, b = ox*d.x+oy*d.y+oz*d.z, cc = ox*ox+oy*oy+oz*oz-r*r, disc = b*b-cc;
     if(disc < 0) return -1; const t = -b - Math.sqrt(disc); return t > 0 ? t : -1; }
   function onShoot(){
-    if(!on) return; send({t:'sh'});
+    if(!on) return;
     camera.getWorldPosition(_o); camera.getWorldDirection(_d);
+    { const e = window.__shotEnd || new THREE.Vector3().copy(_o).addScaledVector(_d,150); send({t:'sh', p:[r2(e.x),r2(e.y),r2(e.z)], m:window.__shotMat||''}); }
     let best = null, bt = 90;
     remotes.forEach(r=>{
       const c = new THREE.Vector3();
@@ -6780,18 +6891,18 @@ window.OSIL_NET = (function(){
   function showAuth(s, note, onOk, force){
     const old = document.getElementById('auth-ov'); if(old) old.remove();
     const ov = document.createElement('div'); ov.id = 'auth-ov';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:auto;font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;background:linear-gradient(rgba(8,12,20,.72),rgba(8,12,20,.82)),url(1/menu-bg-update.webp) center/cover no-repeat,#10131a';
-    const I = 'width:100%;box-sizing:border-box;padding:12px 14px;margin:5px 0;border:1px solid #3a423d;background:rgba(14,18,16,.92);color:#fff;font-size:16px;letter-spacing:.5px;outline:none;border-radius:0';
-    const B = 'flex:1;padding:14px 6px;border:0;border-radius:0;background:#1b231f;color:#f3ece6;font-size:17px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border-bottom:3px solid #4c6a58';
-    ov.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><img src="1/icon-192.png" style="width:74px;height:74px;box-shadow:0 4px 14px rgba(0,0,0,.6)" alt=""><div style="line-height:.95"><div style="font-size:54px;font-weight:900;color:#f6ece4;letter-spacing:2px">ANODE</div><div style="background:#f6ece4;color:#111;font-weight:900;font-size:17px;letter-spacing:1px;padding:2px 8px;display:inline-block">SURVIVAL ISLAND</div></div></div>' +
-      '<div style="width:min(90vw,360px);background:rgba(20,26,23,.9);padding:14px 16px;color:#eee;box-shadow:0 8px 30px rgba(0,0,0,.6)">' +
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box;font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;background:linear-gradient(rgba(8,12,20,.72),rgba(8,12,20,.82)),url(1/menu-bg-update.webp) center/cover no-repeat,#10131a';
+    const I = 'width:100%;box-sizing:border-box;padding:clamp(7px,1.6vh,12px) 14px;margin:clamp(3px,.6vh,5px) 0;border:1px solid #3a423d;background:rgba(14,18,16,.92);color:#fff;font-size:16px;letter-spacing:.5px;outline:none;border-radius:0';
+    const B = 'flex:1;padding:clamp(8px,1.8vh,14px) 6px;border:0;border-radius:0;background:#1b231f;color:#f3ece6;font-size:clamp(13px,2.2vh,17px);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border-bottom:3px solid #4c6a58';
+    ov.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:clamp(6px,2vh,16px)"><img src="1/icon-192.png" style="width:clamp(40px,10vh,74px);height:clamp(40px,10vh,74px);box-shadow:0 4px 14px rgba(0,0,0,.6)" alt=""><div style="line-height:.95"><div style="font-size:clamp(30px,8.5vh,54px);font-weight:900;color:#f6ece4;letter-spacing:2px">ANODE</div><div style="background:#f6ece4;color:#111;font-weight:900;font-size:clamp(11px,2.4vh,17px);letter-spacing:1px;padding:2px 8px;display:inline-block">SURVIVAL ISLAND</div></div></div>' +
+      '<div style="width:min(90vw,360px);background:rgba(20,26,23,.9);padding:clamp(8px,1.6vh,14px) 16px;color:#eee;box-shadow:0 8px 30px rgba(0,0,0,.6)">' +
       '<div id="au-t" style="font-size:15px;font-weight:700;letter-spacing:1px;color:#cfe6d6;margin-bottom:6px;text-transform:uppercase"></div>' +
       '<input id="au-u" style="'+I+'" placeholder="НИК (3–16 символов)" maxlength="16" autocapitalize="off" autocomplete="username">' +
       '<input id="au-p" type="password" style="'+I+'" placeholder="ПАРОЛЬ (от 6 символов)" maxlength="64" autocomplete="current-password">' +
-      '<div id="au-e" style="color:#ff8a80;font-size:13px;min-height:18px;margin:2px 0 8px"></div>' +
+      '<div id="au-e" style="color:#ff8a80;font-size:13px;min-height:clamp(12px,2vh,18px);margin:2px 0 clamp(3px,1vh,8px)"></div>' +
       '<div style="display:flex;gap:8px"><button id="au-l" style="'+B+'">Войти</button><button id="au-r" style="'+B+'">Регистрация</button></div>' +
-      '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;color:#c9c4bd"><input id="au-ok" type="checkbox" checked style="width:18px;height:18px"><span>Я прочитал и согласился с <span style="color:#4fd1c5">политикой конфиденциальности</span> и <span style="color:#4fd1c5">условиями использования</span></span></label>' +
-      '<button id="au-c" style="width:100%;margin-top:8px;padding:10px;background:none;border:none;color:#9a968f;font-size:14px;'+(force?'display:none':'')+'">Отмена</button></div>';
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:clamp(5px,1.4vh,12px);font-size:12px;color:#c9c4bd"><input id="au-ok" type="checkbox" checked style="width:18px;height:18px"><span>Я прочитал и согласился с <span style="color:#4fd1c5">политикой конфиденциальности</span> и <span style="color:#4fd1c5">условиями использования</span></span></label>' +
+      '<button id="au-c" style="width:100%;margin-top:clamp(2px,.8vh,8px);padding:clamp(4px,1vh,10px);background:none;border:none;color:#9a968f;font-size:14px;'+(force?'display:none':'')+'">Отмена</button></div>';
     document.body.appendChild(ov);
     const $$ = id => ov.querySelector('#' + id), err = $$('au-e');
     $$('au-t').textContent = 'Сервер «' + String(s.name || s.host).replace(/localhost/ig,'server') + '»'; if(note) err.textContent = note;
@@ -6906,7 +7017,7 @@ window.OSIL_NET = (function(){
     const saveNow = () => { if(on){ try{ send(profile()); }catch(e){} } };
     setInterval(saveNow, 2000); document.addEventListener('visibilitychange', () => { if(document.hidden) saveNow(); }); window.addEventListener('pagehide', saveNow);
     let last = performance.now();
-    (function loop(){ const n = performance.now(), dt = Math.min(0.1, (n-last)/1000); last = n; animRemotes(dt); animBags(dt); requestAnimationFrame(loop); })();
+    (function loop(){ const n = performance.now(), dt = Math.min(0.1, (n-last)/1000); last = n; animRemotes(dt); animFx(dt); animBags(dt); requestAnimationFrame(loop); })();
   }
   try{ init(); }catch(e){ alert('Ошибка net.js: ' + e.message); }
   /* ---- синхронизация кабанов (хост = клиент с наименьшим id) и коптеров ---- */
@@ -6935,7 +7046,7 @@ window.OSIL_NET = (function(){
     const g = rc.g, k = 0.3; g.position.x += (rc.tx - g.position.x) * k; g.position.y += (rc.ty - g.position.y) * k; g.position.z += (rc.tz - g.position.z) * k;
     let d = rc.tr - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g.rotation.y += d * k; g.rotation.x = rc.tq; g.rotation.z = rc.tw;
     if(rc.hub && rc.p) rc.hub.rotation.y += 0.9; }); }, 33);
-  return {boarHit(i, d){ send({t:'zd', i, d}); }, harvest, drop: dropSel, connect, disconnect, refresh, onDestroy, onHit, onBuild, onShoot, onSwing, melee, hurt, resetDie(){ dieSent = false; }, get on(){ return on; }};
+  return {boarHit(i, d){ send({t:'zd', i, d}); }, fx, fxHit, harvest, drop: dropSel, connect, disconnect, refresh, onDestroy, onHit, onBuild, onShoot, onSwing, melee, hurt, resetDie(){ dieSent = false; }, get on(){ return on; }};
 })();
 
 
