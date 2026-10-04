@@ -815,3 +815,16 @@ body.hud-off #hud-bars, body.hud-off #hotbar, body.hud-off #minimap, body.hud-of
 
 #net-chat-x{ position:fixed; left:min(calc(8px + 60vw + 6px),372px); bottom:90px; z-index:70; width:34px; height:34px; border:none; background:rgba(120,30,30,.85); color:#fff; font-size:16px; }
 body.ui-open #net-chat-x{ display:none !important; }
+
+/* кнопка коптера — как остальные кнопки действий */
+#copter-btn:active{ background:rgba(96,130,50,.95) !important; }
+
+/* донат: без скролла, всё помещается в экран */
+#m-paneDonate{ overflow:hidden !important; }
+#m-paneDonate:not(.hidden){ display:flex; flex-direction:column; justify-content:center; padding-top:4px; padding-bottom:4px; }
+#m-donate{ width:min(760px,100%); max-height:100%; min-height:0; box-sizing:border-box; padding:clamp(6px,1.4vh,12px); }
+#m-donate .sh-top{ margin-bottom:clamp(3px,1vh,10px); }
+#m-donate .sh-grid{ grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:clamp(4px,1vh,8px); }
+#m-donate .sh-card{ height:clamp(84px,calc(100vh - 250px),180px); max-width:200px; width:100%; justify-self:center; }
+#m-donate .sh-msg{ min-height:0; margin:clamp(3px,1vh,10px) 0 2px; }
+#m-donate .sh-bar{ padding:clamp(4px,1vh,8px) 10px; margin-top:clamp(3px,.8vh,8px); }
