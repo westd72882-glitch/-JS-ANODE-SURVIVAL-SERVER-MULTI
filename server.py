@@ -289,10 +289,10 @@ def api_admin(d):
         for u_, ip_ in qa('SELECT u,ip FROM sessions'): ips.setdefault(u_, set()).add(ip_)
         rows = []
         for u_, cr, ll, lip in qa('SELECT u,created,last_login,last_ip FROM accounts ORDER BY last_login DESC'):
-            w = wallet(u_); p = qa('SELECT kills,deaths,playtime FROM players WHERE tok=?', (u_,)); k, de, pt = p[0] if p else (0, 0, 0); xp_ = get_xp(u_)
+            w = wallet(u_); p = qa('SELECT kills,deaths,playtime,seen FROM players WHERE tok=?', (u_,)); k, de, pt, sn = p[0] if p else (0, 0, 0, 0); xp_ = get_xp(u_)
             al = sorted(ips.get(u_, set()) | ({lip} if lip else set()))
             rows.append({'u': u_, 'created': cr, 'last': ll, 'ip': lip, 'ips': al, 'coins': w['coins'], 'admin': w['admin'], 'level': level_of(xp_), 'xp': xp_, 'items': owned(u_),
-                         'kills': k, 'deaths': de, 'min': (pt or 0) // 60, 'online': u_.casefold() in online, 'banned': u_.casefold() in bu, 'ipbanned': any(i in bi for i in al)})
+                         'kills': k, 'deaths': de, 'min': (pt or 0) // 60, 'seen': max(ll or 0, sn or 0), 'online': u_.casefold() in online, 'banned': u_.casefold() in bu, 'ipbanned': any(i in bi for i in al)})
         return 200, {'players': rows}
     a = find_acc(tg)
     if not a: return 404, {'error': 'Аккаунт не найден'}
@@ -553,13 +553,17 @@ NODES = {'wood': (50, 6, 10), 'stone': (50, 8, 14), 'sulfur': (50, 6, 10), 'meta
 GOOD = {'axe': ('wood', 'cloth'), 'pickaxe': ('stone', 'sulfur', 'metal')}
 BARREL_LOOT = [('ammo_rifle', 0.22, 6, 14), ('ammo_pistol', 0.22, 6, 12), ('metal', 0.30, 5, 15), ('gear', 0.10, 1, 1),
                ('pipe', 0.10, 1, 2), ('gunpowder', 0.12, 2, 5), ('fuel', 0.08, 1, 1), ('nails', 0.12, 4, 10)]
-WDMG = {'rock': 10, 'rifle': 20, 'pistol': 25, 'berdanka': 35, 'smg': 18, 'axe': 15, 'pickaxe': 12, 'spear': 25}
+WDMG = {'rock': 10, 'rifle': 20, 'pistol': 25, 'berdanka': 35, 'smg': 18, 'axe': 15, 'pickaxe': 12, 'spear': 25, 'knife': 28}
 GUNS_W = ('rifle', 'pistol', 'berdanka', 'smg')
 node_types = {}
 def broadcast(obj, skip=None):
     with LOCK: t = [c for c in clients.values() if c is not skip]
     for c in t: c.send(obj)
 def say(s): broadcast({'t': 'c', 'n': '', 'm': s})
+def fl3(v):
+    try: a = [round(float(x), 2) for x in v][:3]
+    except Exception: return None
+    return a if len(a) == 3 and all(math.isfinite(x) for x in a) else None
 
 def ticker():
     while True:
@@ -849,7 +853,21 @@ def handle_msg(cl, m):
         if near:
             q('DELETE FROM bags WHERE id=?', (bid,)); cl.send({'t': 'got', 'k': b['k'], 'n': b['n'], 'd': b['d']})
             broadcast({'t': 'bgx', 'id': bid}); print(f'[подбор] {cl.name}: {b["k"]} x{b["n"]}')
-    elif t in ('sh', 'sw'): broadcast({'t': t, 'id': cl.id}, skip=cl)
+    elif t == 'sw': broadcast({'t': 'sw', 'id': cl.id}, skip=cl)
+    elif t == 'sh':                         # выстрел: остальным уходит ещё точка попадания (трассер и частицы)
+        o = {'t': 'sh', 'id': cl.id}; pp = fl3(m.get('p'))
+        if pp: o['p'] = pp; o['m'] = str(m.get('m', ''))[:12]
+        broadcast(o, skip=cl)
+    elif t == 'fx':                         # эффекты: полёт ракеты/гранаты/сатчела и частицы ударов
+        k, now = m.get('k'), time.time(); oo = fl3(m.get('o'))
+        if k not in ('rk', 'gr', 'sa', 'hp') or not oo or not cl.st or now - getattr(cl, 'last_fx', 0) < 0.05: return
+        o = {'t': 'fx', 'id': cl.id, 'k': k, 'o': oo}
+        if k == 'hp': o['m'] = str(m.get('m', ''))[:12]
+        else:
+            dd = fl3(m.get('d'))
+            if not dd: return
+            o['d'] = dd
+        cl.last_fx = now; broadcast(o, skip=cl)
     elif t == 'hit':
         w = m.get('w'); now = time.time()
         with LOCK: v = clients.get(m.get('to'))
