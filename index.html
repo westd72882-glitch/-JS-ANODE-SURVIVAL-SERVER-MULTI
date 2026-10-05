@@ -29,16 +29,20 @@
 
   <!-- верхняя панель -->
   <header class="m-top">
-    <div class="m-brand"><span class="m-logo"></span><b>ANODE</b></div>
+    <div class="m-brand"><span class="m-logo"></span></div>
+    <div class="m-profile">
+      <div class="m-ava"></div>
+      <div class="m-pinfo"><div id="m-pName">Игрок</div><div class="m-coins"><i></i><span id="m-pCoins">0</span></div></div>
+      <div class="m-lvl" id="m-pLvl">1</div>
+    </div>
     <nav class="m-nav">
       <div class="m-tab active" data-tab="home"><i class="ic-home"></i><b>Главная</b></div>
       <div class="m-tab" data-tab="servers"><i class="ic-play"></i><b>Играть</b><span id="m-tabSubServ">2 сервер(ов), 0 игрок(ов)</span></div>
       <div class="m-tab" data-tab="donate"><i class="ic-gift"></i><b>Донат</b></div>
       <div class="m-tab" data-tab="promo"><i class="ic-gift"></i><b>Промокод</b></div>
+      <div class="m-tab" id="m-gearBtn"><i class="ic-gear"></i><b>Настройки</b></div>
     </nav>
-    <div class="m-tools">
-      <button class="m-tbtn" id="m-gearBtn"><i class="ic-gear"></i><b>Настройки</b></button>
-    </div>
+    <div class="m-tools"></div>
   </header>
 
   <!-- контент -->
@@ -54,13 +58,32 @@
         <h1>ANODE SURVIVAL</h1>
         <p>Выживай, добывай ресурсы, крафти и строй базу. В этом обновлении: новые реалистичные руки, кирка и топор, плавные анимации, переработанные меню и настройки.</p>
         <div class="m-herobtns">
-          <button class="m-hb" id="m-changeBtn"><i class="ic-list"></i>СПИСОК ИЗМЕНЕНИЙ</button>
+          <button class="m-hb" id="m-changeBtn"><i class="ic-list"></i>НОВОСТИ</button>
           <button class="m-hb gold" id="m-goServers"><i class="ic-play"></i>ПОДРОБНЕЕ</button>
         </div>
-        <div class="m-changes hidden" id="m-changes">
-          <div>• Реалистичные руки с анатомичным хватом, PBR-кирка и новый топор</div>
-          <div>• Плавные физичные анимации: ходьба, бег, замах, удар, отдача</div>
-          <div>• Новое меню и настройки с пресетами графики</div>
+      </div>
+    </section>
+
+    <section id="m-paneNews" class="hidden">
+      <div class="nw-wrap">
+        <div class="nw-top"><button class="m-hb" id="nw-back">НАЗАД</button><span class="nw-badge">ОБНОВЛЕНИЕ № 1</span><span class="nw-date">05.10.2026</span></div>
+        <div class="nw-scroll">
+          <div class="nw-img"><div class="nw-imgtxt"><b>ANODE SURVIVAL</b><span>ПОСТОЯННЫЙ МИР · НОВЫЙ НОЖ · ОСМОТР</span></div></div>
+          <h2 class="nw-title">Обновление № 1: мир остаётся навсегда</h2>
+          <div class="nw-meta">Номер обновления: 1 · Дата выхода: 05.10.2026</div>
+          <div class="nw-h">ЧТО ДОБАВЛЕНО</div>
+          <ul class="nw-list">
+            <li><b>Постоянный мир.</b> Постройки, карьеры и миникоптеры хранятся на сервере и остаются после перезапуска.</li>
+            <li><b>Боевой нож.</b> Новая поза и прямой хват, клинок повёрнут плашмя к камере, удар стал медленнее.</li>
+            <li><b>Осмотр предметов.</b> Своя кнопка (на ПК клавиша Y) и короткая анимация без спама.</li>
+            <li><b>Руки.</b> Убраны ногти, хват стал аккуратнее.</li>
+            <li><b>Промокод TESTER.</b> Неограниченные ресурсы на сервере и 500 монет, без админки.</li>
+            <li><b>Разрушение камней.</b> Камни и руды рассыпаются частицами и пылью на месте.</li>
+            <li><b>Производительность.</b> Карьер стал легче для видеокарты. Новый параметр «Ультра-оптимизация · 60 FPS» в настройках графики.</li>
+            <li><b>Меню.</b> Профиль и круговой индикатор уровня вверху, новый магазин на весь экран, вкладка «Новости».</li>
+            <li><b>Загрузка.</b> Новые экраны с логотипом и крутящимся кружком.</li>
+            <li><b>Интерфейс.</b> Единый стиль надписей и кнопок без значков, тонкая обводка у кнопок.</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -86,17 +109,8 @@
       </div>
     </section>
   </main>
+  <button class="m-play hide" id="start-btn"><i class="ic-play"></i>ИГРАТЬ</button>
 
-  <!-- нижняя панель -->
-  <footer class="m-bottom">
-    <div class="m-profile">
-      <div class="m-ava"></div>
-      <div class="m-pinfo"><div id="m-pName">Игрок</div><div class="m-coins"><i></i><span id="m-pCoins">0</span></div></div>
-      <div class="m-lvl" id="m-pLvl">1</div>
-    </div>
-    <div class="m-ver">ANODE 1.0 alpha · v73</div>
-    <button class="m-play" id="start-btn"><i class="ic-play"></i>ИГРАТЬ</button>
-  </footer>
 </div>
 
 <div id="m-setModal" class="hidden"></div>
@@ -144,6 +158,7 @@
     <div class="round-btn" id="btn-crouch"><img src="1/build_button.webp" alt=""></div>
     <div class="round-btn gun-btn" id="btn-aim"><img src="1/aim-button.webp" alt=""></div>
     <div class="round-btn gun-btn" id="btn-reload"><img src="1/reload-button.webp" alt=""></div>
+    <div class="round-btn" id="btn-inspect" aria-label="Осмотр"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" class="ib-r"/><g transform="rotate(-28 32 31)"><rect x="15" y="25" width="30" height="7" rx="1.5" class="ib-w"/><path d="M24 32 H32 L30 44 H23 Z" class="ib-w"/><rect x="41" y="23" width="6" height="3" class="ib-w"/></g><path d="M20 47 Q32 54 44 47" class="ib-a"/><path d="M41 43.5 L45 47 L40 49.5" class="ib-a"/></svg></div>
     <div class="round-btn" id="btn-hit"><img src="1/strike-button.webp" alt=""></div>
     <div class="round-btn" id="btn-jump"><img src="1/jump-button.webp" alt=""></div>
     <div class="round-btn" id="btn-run"><img src="1/run-button.webp" alt=""></div>
@@ -259,12 +274,12 @@
 <script>
 /* главная вкладка меню: быстрое подключение, переключение панелей */
 (function(){
-  const $=id=>document.getElementById(id), tabs=[...document.querySelectorAll('.m-tab')];
-  const panes={home:$('m-paneHome'),servers:$('m-paneServers'),top:$('m-paneTop'),promo:$('m-panePromo'),donate:$('m-paneDonate')};
-  function show(w){ for(const k in panes) panes[k].classList.toggle('hidden',k!==w); tabs.forEach(t=>t.classList.toggle('active',t.dataset.tab===w)); }
+  const $=id=>document.getElementById(id), tabs=[...document.querySelectorAll('.m-tab[data-tab]')];
+  const panes={home:$('m-paneHome'),servers:$('m-paneServers'),top:$('m-paneTop'),promo:$('m-panePromo'),news:$('m-paneNews'),donate:$('m-paneDonate')};
+  function show(w){ for(const k in panes) panes[k].classList.toggle('hidden',k!==w); { const pb=$('start-btn'); if(pb) pb.classList.toggle('hide', w!=='servers'); } tabs.forEach(t=>t.classList.toggle('active',t.dataset.tab===w)); }
   tabs.forEach(t=>t.addEventListener('click',()=>show(t.dataset.tab)));
   $('m-goServers').addEventListener('click',()=>{ show('servers'); tabs.find(t=>t.dataset.tab==='servers').click(); });
-  $('m-changeBtn').addEventListener('click',()=>$('m-changes').classList.toggle('hidden'));
+  $('m-changeBtn').addEventListener('click',()=>show('news')); $('nw-back').addEventListener('click',()=>show('home'));
   function quick(){
     const L=$('m-quickList'); if(!L||typeof mServers==='undefined') return; L.innerHTML='';
     mServers.slice(0,3).forEach((s,i)=>{

@@ -230,14 +230,14 @@ def add_xp(u, n):
     if u and n: q('INSERT INTO xp(u,v) VALUES(?,?) ON CONFLICT(u) DO UPDATE SET v=xp.v+excluded.v', (u, int(n)))
 def get_xp(u):
     r = qa('SELECT v FROM xp WHERE u=?', (u,)); return r[0][0] if r else 0
-PROMOS = {'OSIL2026': 100, 'RUSTLIKE': 50, 'TESTER': 25}; ADMIN_CODE, ADMIN_COINS = 'ADMIN6737', 1000
+PROMOS = {'OSIL2026': 100, 'RUSTLIKE': 50}; TESTER_CODE, TESTER_COINS = 'TESTER', 500; ADMIN_CODE, ADMIN_COINS = 'ADMIN6737', 1000
 def wallet(u):
     q('INSERT INTO wallet(u,coins,admin,promos) VALUES(?,0,0,?) ON CONFLICT(u) DO NOTHING', (u, ''))
     r = qa('SELECT coins,admin,promos FROM wallet WHERE u=?', (u,))[0]; return {'coins': r[0] or 0, 'admin': bool(r[1]), 'promos': [x for x in (r[2] or '').split(',') if x]}
 def level_of(xp): return 1 + int(math.sqrt(max(0, xp or 0) / 25.0))   # ур.2=25, ур.5=400, ур.10=2025 опыта
 def me_info(u):
     w = wallet(u); x = get_xp(u); L = level_of(x)
-    return {'u': u, 'coins': w['coins'], 'admin': w['admin'], 'level': L, 'xp': x, 'xpmin': (L - 1) ** 2 * 25, 'xpmax': L ** 2 * 25, 'items': owned(u), 'shop': SHOP}
+    return {'u': u, 'coins': w['coins'], 'admin': w['admin'], 'level': L, 'xp': x, 'xpmin': (L - 1) ** 2 * 25, 'xpmax': L ** 2 * 25, 'items': owned(u), 'shop': SHOP, 'tester': TESTER_CODE in w['promos']}
 def api_promo(d):
     u = session_user(d.get('token'))
     if not u: return 401, {'error': 'Войдите в аккаунт на сервере'}
@@ -247,6 +247,10 @@ def api_promo(d):
         if code not in w['promos']: q('UPDATE wallet SET coins=coins+?, admin=1, promos=? WHERE u=?', (ADMIN_COINS, ','.join(w['promos'] + [code]), u)); msg += f', +{ADMIN_COINS} монет'
         else: q('UPDATE wallet SET admin=1 WHERE u=?', (u,))
         print(f'* {u} активировал админ-код'); return 200, {'msg': msg, **me_info(u)}
+    if code == TESTER_CODE:     # безлимитные ресурсы на сервере + 500 монет, без админки
+        if code in w['promos']: return 200, {'error': 'Код уже использован'}
+        q('UPDATE wallet SET coins=coins+?, promos=? WHERE u=?', (TESTER_COINS, ','.join(w['promos'] + [code]), u)); print(f'* {u} активировал TESTER')
+        return 200, {'msg': f'Режим тестера: безлимитные ресурсы, +{TESTER_COINS} монет', **me_info(u)}
     if code in w['promos']: return 200, {'error': 'Код уже использован'}
     cp = qa('SELECT coins,item,uses,used FROM promocodes WHERE code=?', (code,))
     if cp:
@@ -339,6 +343,11 @@ CREATE TABLE IF NOT EXISTS locks(k TEXT PRIMARY KEY, c TEXT);
 CREATE TABLE IF NOT EXISTS dauth(u TEXT, k TEXT, PRIMARY KEY(u,k));
 CREATE TABLE IF NOT EXISTS storage(id TEXT PRIMARY KEY, j TEXT);''')
 migrate_sqlite_to_pg()
+DB.executescript('''CREATE TABLE IF NOT EXISTS copters(u TEXT PRIMARY KEY, j TEXT);''')
+cops = {}; COPL = threading.Lock(); _copsave = {}
+for _r in qa('SELECT u,j FROM copters'):
+    try: cops[_r[0]] = json.loads(_r[1])
+    except ValueError: pass
 PMAX = {'foundation': 250, 'floor': 200, 'wall': 200, 'doorway': 200, 'door': 200, 'mdoor': 450, 'cupboard': 150, 'box': 150, 'quarry': 300, 'furnace': 150}
 REFUND = {'furnace': ('furnace', 1), 'foundation': ('wood', 10), 'floor': ('wood', 8), 'wall': ('wood', 10), 'doorway': ('wood', 10), 'door': ('door', 1), 'mdoor': ('mdoor', 1), 'cupboard': ('cupboard', 1), 'box': ('box', 1), 'quarry': ('quarry', 1)}
 UPGR = ('foundation', 'floor', 'wall', 'doorway')
@@ -610,7 +619,7 @@ def handle_msg(cl, m):
                 others = [{'id': c.id, 'n': c.name} for c in clients.values()]
                 clients[cl.id] = cl
                 snap = {'dead': list(world['dead']), 'hp': dict(world['hp']), 'builds': list(world['builds']), 'bags': [bag_pub(b) for b in bags.values()],
-                        'bhp': {k: round(v, 1) for k, v in phpd.items()}, 'locks': list(locks), 'auth': [k for uu, k in dauth if uu == u]}
+                        'bhp': {k: round(v, 1) for k, v in phpd.items()}, 'locks': list(locks), 'auth': [k for uu, k in dauth if uu == u], 'cops': {k_: v_ for k_, v_ in cops.items() if k_ == u or k_ not in {c_.tok for c_ in clients.values()}}}
         if full: cl.send({'t': 'full'}); cl.alive = False; return
         cl.saved_at = time.time()
         cl.send({'t': 'w', 'id': cl.id, 'ver': VER, 'name': NAME, 'you': u, 'players': others, 'me': load_profile(cl.tok) if cl.tok else None, **snap})
@@ -626,7 +635,14 @@ def handle_msg(cl, m):
     elif t == 'zd':                         # урон кабану от не-хоста: пересылаем всем (применит хост)
         if isinstance(m.get('i'), int) and isinstance(m.get('d'), (int, float)): broadcast({'t': 'zd', 'i': m['i'], 'd': min(200, max(0, m['d']))}, skip=cl)
     elif t == 'cs':                         # состояние коптера игрока: рассылаем остальным
-        if isinstance(m.get('x'), (int, float)): broadcast({**{k: m.get(k) for k in ('e', 'x', 'y', 'z', 'r', 'q', 'w', 'p')}, 't': 'cs', 'id': cl.id}, skip=cl)
+        if isinstance(m.get('x'), (int, float)):
+            if m.get('e') and not m.get('p') and all(isinstance(m.get(k), (int, float)) for k in 'xyzr'):    # припаркованный коптер хранится на сервере навсегда
+                st_ = {k: round(float(m.get(k) or 0), 2) for k in ('x', 'y', 'z', 'r')}
+                if cops.get(cl.tok) != st_ and time.time() - _copsave.get(cl.tok, 0) > 2:
+                    cops[cl.tok] = st_; _copsave[cl.tok] = time.time(); q('INSERT OR REPLACE INTO copters VALUES(?,?)', (cl.tok, json.dumps(st_)))
+            elif m.get('e') == 0 and cl.tok in cops:
+                cops.pop(cl.tok, None); q('DELETE FROM copters WHERE u=?', (cl.tok,))
+            broadcast({**{k: m.get(k) for k in ('e', 'x', 'y', 'z', 'r', 'q', 'w', 'p')}, 't': 'cs', 'id': cl.id}, skip=cl)
     elif t == 'hr':                         # добыча ресурса: урон по узлу, количество и лут считает сервер
         i, ty, tool = m.get('i'), m.get('ty'), m.get('k'); now = time.time()
         if not (isinstance(i, int) and 0 <= i < 200000 and ty in NODES) or now - getattr(cl, 'last_hr', 0) < 0.3: return
