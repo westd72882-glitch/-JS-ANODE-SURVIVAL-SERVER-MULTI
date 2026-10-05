@@ -1,4 +1,4 @@
-const APP_VER = '__APP_VER__';   // подставляется при сборке APK (build-apk.yml)
+const APP_VER = '__APP_VER__', APP_SIG = '__APP_SIG__';   // подставляется при сборке APK (build-apk.yml)
 (function(){
 "use strict";
 const CFG = OSIL_SETTINGS.all;          // живые настройки (меню → localStorage)
@@ -6956,7 +6956,7 @@ window.OSIL_NET = (function(){
       if(!$$('au-ok').checked){ err.textContent = 'Нужно согласие с условиями'; return; }
       busy = true; err.style.color = '#ccc'; err.textContent = 'Подождите…';
       try{
-        const r = await fetch(baseUrl(s) + '/api/' + kind, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({u, p, v:APP_VER})});
+        const r = await fetch(baseUrl(s) + '/api/' + kind, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({u, p, v:APP_VER, s:APP_SIG})});
         const d = await r.json();
         if(!r.ok || !d.token){ err.style.color = '#ff8a80'; err.textContent = d.error || 'Ошибка'; busy = false; return; }
         authSet(s, {u:d.u, t:d.token}); ov.remove(); setPName(d.u); (onOk || (() => connect(s)))();
@@ -6983,7 +6983,7 @@ window.OSIL_NET = (function(){
     let w; try{ w = new WebSocket(url); }catch(e){ toast('Неверный адрес сервера'); return; }
     ws = w;
     const to = setTimeout(()=>{ if(ws === w && !on){ toast('Сервер не отвечает'); disconnect(); backToMenu(); } }, 6000);
-    w.onopen = () => send({t:'join', k:au.t, v:APP_VER});
+    w.onopen = () => send({t:'join', k:au.t, v:APP_VER, s:APP_SIG});
     w.onmessage = e => { try{ onMsg(JSON.parse(e.data)); }catch(err){ console.warn(err); } };
     w.onerror = () => { if(ws === w && !on){ toast('Не удалось подключиться'); backToMenu(); } };
     w.onclose = () => { clearTimeout(to); if(ws === w){ if(on){ toast('Соединение потеряно'); backToMenu(); } ws = null; cleanup(); } };
