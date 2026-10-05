@@ -562,7 +562,7 @@ body.ui-open #craft-queue, body.ui-open #part-hp, body.ui-open #hm-prompt, body.
 #layout-bar #lo-copy{ background:rgba(40,110,150,.95); }
 #layout-bar #lo-done{ background:rgba(96,130,50,.95); }
 body.layout-edit, body.layout-edit *{ touch-action:none; }
-body.layout-edit #btn-run, body.layout-edit #btn-hit, body.layout-edit #btn-jump, body.layout-edit #btn-crouch, body.layout-edit #btn-inv,
+body.layout-edit #btn-inspect, body.layout-edit #btn-run, body.layout-edit #btn-hit, body.layout-edit #btn-jump, body.layout-edit #btn-crouch, body.layout-edit #btn-inv,
 body.layout-edit #btn-craft, body.layout-edit #btn-map, body.layout-edit #btn-pause, body.layout-edit #hotbar,
 body.layout-edit #hud-bars, body.layout-edit #ammo-hud, body.layout-edit .gun-btn, body.layout-edit #minimap, body.layout-edit #fps-counter{
   outline:2px dashed #9db07a; outline-offset:2px; pointer-events:auto !important; cursor:move;
@@ -828,3 +828,125 @@ body.ui-open #net-chat-x{ display:none !important; }
 #m-donate .sh-card{ height:clamp(84px,calc(100vh - 250px),180px); max-width:200px; width:100%; justify-self:center; }
 #m-donate .sh-msg{ min-height:0; margin:clamp(3px,1vh,10px) 0 2px; }
 #m-donate .sh-bar{ padding:clamp(4px,1vh,8px) 10px; margin-top:clamp(3px,.8vh,8px); }
+
+/* --- меню: без нижней полосы, профиль в левом верхнем углу --- */
+.m-bottom{ display:none !important; }
+#start-screen .m-top{ gap:14px; }
+#start-screen .m-profile{ margin-right:6px; }
+#start-screen .m-play{ height:32px; padding:0 20px; font-size:14px; }
+#start-screen .m-tools{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+
+/* кнопка осмотра: своя отрисовка в стиле игры */
+#btn-inspect{ right:124px; bottom:calc(112px + env(safe-area-inset-bottom,0px)); width:52px; height:52px; display:none; }
+#btn-inspect svg{ width:52px; height:52px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)); pointer-events:none; }
+#btn-inspect .ib-r{ fill:rgba(20,20,19,.55); stroke:#fff; stroke-width:3.5; }
+#btn-inspect .ib-b{ fill:#e8e4dc; } #btn-inspect .ib-h{ fill:#ecb42a; }
+#btn-inspect .ib-a{ fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+#btn-inspect.active .ib-r{ stroke:#ecb42a; }
+.plat-pc #btn-inspect{ display:none!important; }
+@media (max-height:400px){ #btn-inspect{ right:196px; bottom:calc(36px + env(safe-area-inset-bottom,0px)); } }
+#net-chat-btn{ width:auto!important; padding:0 10px; font:700 11px var(--rf,sans-serif)!important; letter-spacing:.8px; } #net-chat-x{ width:auto!important; padding:0 10px; font:700 11px var(--rf,sans-serif)!important; letter-spacing:.8px; }
+
+#start-screen .m-play{ position:absolute; right:calc(18px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:6; height:44px; padding:0 34px; font-size:16px; box-shadow:0 2px 10px rgba(0,0,0,.5); }
+#start-screen .m-tools{ flex:none; }
+
+#btn-inspect .ib-r{ fill:none !important; }
+body.layout-edit #btn-inspect{ display:flex !important; }
+#start-screen .m-tools{ margin-right:calc(34px + env(safe-area-inset-right,0px)); }
+#start-screen .m-play.hide{ display:none !important; }
+
+#start-screen .m-tools{ margin-right:calc(86px + env(safe-area-inset-right,0px)); }
+#m-servList{ padding-bottom:70px; }
+/* кнопка осмотра: белая иконка повёрнутого оружия, без заливки */
+#btn-inspect .ib-w{ fill:#fff; stroke:none; }
+#btn-inspect .ib-a{ stroke:#fff; }
+
+/* экраны загрузки: как окно входа — логотип, название, кружок и надпись внизу */
+#loading-screen{ flex-direction:column; justify-content:center; font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif; }
+#loading-screen .ld-bg{ background:linear-gradient(rgba(8,12,20,.72),rgba(8,12,20,.82)),url('../1/menu-bg-update.webp') center/cover no-repeat,#10131a; filter:none; transform:none; }
+#loading-screen .ld-box{ display:none; }
+#loading-screen .ld-logo{ position:relative; display:flex; align-items:center; gap:14px; }
+#loading-screen .ld-logo img{ width:clamp(48px,12vh,84px); height:clamp(48px,12vh,84px); box-shadow:0 4px 14px rgba(0,0,0,.6); }
+#loading-screen .ld-logo .t1{ font-size:clamp(34px,9.5vh,60px); font-weight:900; color:#f6ece4; letter-spacing:2px; line-height:.95; }
+#loading-screen .ld-logo .t2{ background:#f6ece4; color:#111; font-weight:900; font-size:clamp(11px,2.6vh,18px); letter-spacing:1px; padding:2px 8px; display:inline-block; margin-top:2px; }
+#loading-screen .ld-spin{ position:absolute; left:50%; bottom:calc(64px + env(safe-area-inset-bottom,0px)); width:34px; height:34px; margin-left:-17px; border:3px solid rgba(255,255,255,.18); border-top-color:#f6ece4; border-radius:50%; animation:ldspin .9s linear infinite; }
+#loading-screen .ld-txt{ position:absolute; left:0; right:0; bottom:calc(30px + env(safe-area-inset-bottom,0px)); text-align:center; font-size:14px; font-weight:700; letter-spacing:4px; color:#cfc9c2; }
+@keyframes ldspin{ to{ transform:rotate(360deg); } }
+
+/* без синей подсветки при касании и выделения текста */
+*,*::before,*::after{ -webkit-tap-highlight-color:transparent; }
+html,body,button,div,span,img,b,i,section,nav,header,footer,label{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+input,textarea{ -webkit-user-select:text; user-select:text; }
+button,[role=button],.round-btn,.m-tab,.m-hb,.m-btn,.m-tbtn,.m-qrow,.m-srow,.pm-btn{ outline:none !important; }
+::selection{ background:transparent; }
+input::selection,textarea::selection{ background:rgba(255,255,255,.25); }
+
+/* кнопка настроек — в стиле вкладок меню */
+#start-screen .m-tools{ align-self:stretch; }
+#m-gearBtn{ height:100%; padding:0 clamp(10px,2.2vw,26px); background:none; border:none; border-bottom:3px solid transparent; border-radius:0; color:var(--rd); font:700 14px var(--rf); text-transform:uppercase; letter-spacing:1px; transition:background .15s,color .15s; }
+#m-gearBtn b{ display:inline !important; font-size:14px; font-weight:700; }
+#m-gearBtn:hover,#m-gearBtn:active{ color:#fff; background:linear-gradient(180deg, rgba(201,66,43,.05), rgba(201,66,43,.38)); border-bottom-color:var(--rr); }
+
+/* уровень: круговой индикатор прогресса с цифрой внутри */
+#start-screen .m-lvl{ --p:0; position:relative; isolation:isolate; display:flex; align-items:center; justify-content:center; width:38px !important; height:38px !important; border-radius:50% !important; border:none !important; font:800 14px var(--rf) !important; color:#fff;
+  background:conic-gradient(#f6ece4 calc(var(--p)*1%), rgba(255,255,255,.18) 0) !important; }
+#start-screen .m-lvl::before{ content:''; position:absolute; inset:3px; border-radius:50%; background:#1b1b1a; z-index:-1; }
+#m-changes{ max-height:34vh; overflow:auto; }
+
+/* тонкая тёмная обводка у белых кнопок, как у остальных */
+#btn-pause svg,#btn-inspect svg{ filter:drop-shadow(0 0 .6px rgba(0,0,0,.9)) drop-shadow(0 0 .6px rgba(0,0,0,.9)) drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+#btn-pause circle,#btn-inspect .ib-r{ stroke-width:3.2; }
+#btn-inspect .ib-w,#btn-pause rect{ fill:#fff; }
+
+/* меню: «Настройки» — в ряду вкладок, тот же уровень, отступы и размер значка */
+#start-screen .m-tools{ display:none; }
+#start-screen #m-gearBtn{ position:relative; display:flex; align-items:center; gap:7px; height:100%; padding:0 clamp(10px,2.2vw,26px); margin:0; }
+#start-screen #m-gearBtn i{ width:18px; height:18px; }
+@media (max-width:640px){ #m-gearBtn i{ display:none; } }
+
+/* магазин на всё доступное место */
+#m-paneDonate{ padding:8px clamp(8px,2vw,18px); box-sizing:border-box; }
+#m-paneDonate .m-promo, #m-donate{ width:100% !important; max-width:none !important; margin:0 !important; height:100%; overflow:auto; box-sizing:border-box; }
+#m-donate .sh-grid{ display:grid !important; grid-auto-flow:row !important; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)) !important; grid-auto-columns:auto; gap:clamp(6px,1.4vh,12px); }
+#m-donate .sh-card{ max-width:none !important; width:100% !important; height:clamp(130px,calc(100vh - 260px),240px); }
+
+/* «Настройки» — обычная вкладка, как остальные (убираю свои переопределения) */
+#start-screen #m-gearBtn{ height:100%; padding:0 clamp(10px,2.2vw,26px); margin:0; background:none; border:none; border-bottom:3px solid transparent; font:inherit; }
+#start-screen #m-gearBtn:active{ color:#fff; background:linear-gradient(180deg, rgba(201,66,43,.05), rgba(201,66,43,.38)); border-bottom-color:var(--rr); }
+
+/* магазин: на весь экран ниже верхней панели, с заметной обводкой; панель с подсказкой и кнопкой внизу */
+#m-paneDonate{ padding:4px !important; }
+#m-paneDonate .m-promo, #m-donate{ display:flex !important; flex-direction:column; height:100% !important; padding:10px 12px !important; border:1px solid rgba(255,255,255,.35); background:rgba(22,22,21,.88); overflow:hidden !important; }
+#m-donate .sh-grid{ flex:1 1 auto; min-height:0; overflow:auto; align-content:start; }
+#m-donate .sh-msg{ flex:none; }
+#m-donate .sh-bar{ flex:none; margin-top:auto !important; }
+#m-donate .sh-card{ height:clamp(130px,36vh,230px) !important; }
+
+.m-newsimg{ background-image:url('../1/news-1.webp') !important; }
+#start-screen #m-gearBtn{ transform:translate(-30%,3px); }
+/* вкладка новостей */
+#m-paneNews{ padding:6px clamp(8px,2vw,18px); box-sizing:border-box; }
+.nw-wrap{ height:100%; display:flex; flex-direction:column; border:1px solid rgba(255,255,255,.3); background:rgba(22,22,21,.9); box-sizing:border-box; }
+.nw-top{ flex:none; display:flex; align-items:center; gap:12px; padding:8px 12px; border-bottom:1px solid rgba(255,255,255,.15); }
+.nw-badge{ background:#f6ece4; color:#111; font:900 12px var(--rf); letter-spacing:1px; padding:3px 8px; }
+.nw-date{ margin-left:auto; font:700 13px var(--rf); color:#cfc9c2; letter-spacing:1px; }
+.nw-scroll{ flex:1; min-height:0; overflow:auto; padding:12px 16px 18px; }
+.nw-img{ position:relative; width:100%; aspect-ratio:1280/540; max-height:46vh; background:url('../1/news-1.webp') center/cover no-repeat,#10131a; border:1px solid rgba(255,255,255,.18); }
+.nw-imgtxt{ position:absolute; left:min(34%,260px); top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:4px; }
+.nw-imgtxt b{ font:900 clamp(20px,5vw,40px)/1 var(--rf); letter-spacing:2px; color:#f6ece4; text-shadow:0 2px 8px #000; }
+.nw-imgtxt span{ font:700 clamp(10px,1.8vw,14px) var(--rf); letter-spacing:1.5px; color:#e8c86a; text-shadow:0 1px 4px #000; }
+.nw-title{ margin:14px 0 4px; font:900 clamp(20px,4vw,28px)/1.1 var(--rf); letter-spacing:.5px; }
+.nw-meta{ font:600 12px var(--rf); color:#a9a49e; letter-spacing:.8px; margin-bottom:12px; }
+.nw-h{ font:800 13px var(--rf); letter-spacing:2px; color:#e8c86a; border-bottom:1px solid rgba(255,255,255,.15); padding-bottom:4px; margin-bottom:8px; }
+.nw-list{ margin:0; padding:0; list-style:none; font:400 14px/1.5 var(--rf); color:#d5d1ca; }
+.nw-list li{ padding:5px 0 5px 14px; position:relative; } .nw-list li::before{ content:''; position:absolute; left:0; top:13px; width:6px; height:6px; background:#f6ece4; }
+.nw-list b{ color:#fff; }
+
+#start-screen #m-gearBtn{ transform:translate(-15%,3px); }
+#start-screen #m-gearBtn i{ position:relative; top:3px; }
+.nw-img{ aspect-ratio:1875/839 !important; }
+.nw-img::after{ content:''; position:absolute; inset:0; background:linear-gradient(0deg,rgba(0,0,0,.72),rgba(0,0,0,0) 55%); }
+.nw-imgtxt{ left:16px !important; top:auto !important; bottom:12px; transform:none !important; z-index:1; }
+#start-screen #m-gearBtn{ transform:translate(-15%,1px); }
+#start-screen #m-gearBtn{ transform:translate(-15%,-1px); }
+#start-screen #m-gearBtn{ transform:translate(-10%,-1px); }
