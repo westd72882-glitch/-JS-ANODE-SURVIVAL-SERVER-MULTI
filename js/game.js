@@ -2,7 +2,7 @@
 "use strict";
 const CFG = OSIL_SETTINGS.all;          // живые настройки (меню → localStorage)
 let CULL_K = 1;                          // множитель дальности видимости объектов
-let layoutEditing = false, FPS_CAP_MS = 0;
+let layoutEditing = false, FPS_CAP_MS = 0, ultraDyn = 0, ultraLo = 0, ultraHi = 0;
 
 /* ---------------- Texture loader helpers ---------------- */
 const texLoader = new THREE.TextureLoader();
@@ -554,8 +554,11 @@ function updateFalling(dt){
       if(f.t>1.5) m.position.y = f.y0 - Math.min(1,(f.t-1.5)/1.2)*1.6;
       if(f.t>2.7) f.done = true;
     } else {
-      const k = Math.min(1,f.t/0.6); m.scale.setScalar(f.s0*(1-k*k)); m.position.y = f.y0 - k*0.4;
-      if(f.t>=0.6) f.done = true;
+      if(!f.fx){ f.fx = 1; const c = m.position.clone(); c.y += 0.5*f.s0; const ty = f.ty || 'stone';
+        spawnDebris(c.clone(), ty, 22, 1.2); spawnDebris(c.clone(), 'stone', 10, 0.8);
+        if(CFG.particles) for(let q=0;q<5;q++) fxEmit('smoke', c.clone().add(new THREE.Vector3((Math.random()-.5)*0.8,(Math.random()-.5)*0.5,(Math.random()-.5)*0.8)), new THREE.Vector3((Math.random()-.5)*0.6,0.5,(Math.random()-.5)*0.6), 0.9, 0.3, 1.3, 0x8b867d, 0xc9c4ba, {drag:1.2, a:0.5}); }
+      const k = Math.min(1,f.t/0.22); m.scale.setScalar(f.s0*(1-k*k*k));     // на месте, без проваливания вниз
+      if(f.t>=0.22) f.done = true;
     }
     if(f.done){ scene.remove(m); m.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); fallingNodes.splice(i,1); }
   }
@@ -568,7 +571,7 @@ function destroyHarvestable(target, anim){
     rebuildHarvestHitMap();
     const m = target.mesh, ang = Math.random()*6.283;
     _fallAxis.set(Math.cos(ang),0,Math.sin(ang));
-    fallingNodes.push({mesh:m, t:0, tree:target.type==='wood', axis:_fallAxis.clone(), q0:m.quaternion.clone(), y0:m.position.y, s0:m.scale.x});
+    fallingNodes.push({mesh:m, t:0, ty:target.type, tree:target.type==='wood', axis:_fallAxis.clone(), q0:m.quaternion.clone(), y0:m.position.y, s0:m.scale.x});
     return;
   }
   scene.remove(target.mesh);
@@ -1683,7 +1686,7 @@ function renderQuarry(){
     document.head.appendChild(st); }
   const ic = k=>ITEM_DEFS[k].icon;
   quEl.innerHTML =
-    '<div class="qh"><img src="1/quarry.webp" alt=""><div><b>КАРЬЕР</b><small id="qu-t"></small></div><div id="qu-x">✖</div></div>'
+    '<div class="qh"><img src="1/quarry.webp" alt=""><div><b>КАРЬЕР</b><small id="qu-t"></small></div><div id="qu-x">ЗАКРЫТЬ</div></div>'
    +'<div class="qb"><div style="display:flex;flex-direction:column;gap:6px">'
    +'<div class="qc qfuel"><img src="'+ic('fuel')+'" alt=""><div style="flex:1"><div style="display:flex;justify-content:space-between"><span>Топливо</span><span id="qu-fl" style="color:#b9b6b0"></span></div><div class="qbar"><i id="qu-b"></i></div></div></div>'
    +'<div class="qrow"><button id="qu-f1" class="qbtn"><img src="'+ic('fuel')+'" alt="">+1</button><button id="qu-fa" class="qbtn"><img src="'+ic('fuel')+'" alt="">ВСЁ</button></div></div>'
@@ -1745,7 +1748,7 @@ function quarryAnim(dt){
     const sp = p.obj.userData.spin; if(!sp) return;
     if(Math.abs(p.obj.position.x-player.pos.x)+Math.abs(p.obj.position.z-player.pos.z) > 130) return;
     const act = quNet() ? quarActive.has(id) : ((quarState.get(id)||{}).f > 0);
-    if(act && CFG.particles){ const u = p.obj.userData; u._sm = (u._sm||0) - dt; if(u._sm <= 0){ u._sm = 0.3; fxEmit('smoke', new THREE.Vector3(p.obj.position.x+0.4, p.obj.position.y+2.8, p.obj.position.z), new THREE.Vector3(0.1,1.0,0.05), 2.2, 0.25, 1.6, 0x6f6a63, 0xb8b3ab, {drag:0.6, a:0.45}); } }
+    if(act && CFG.particles && Math.abs(p.obj.position.x-player.pos.x)+Math.abs(p.obj.position.z-player.pos.z) < 60 && Math.hypot(p.obj.position.x-player.pos.x,p.obj.position.z-player.pos.z) > 7){ const u = p.obj.userData; u._sm = (u._sm||0) - dt; if(u._sm <= 0){ u._sm = 0.7; fxEmit('smoke', new THREE.Vector3(p.obj.position.x+0.4, p.obj.position.y+2.8, p.obj.position.z), new THREE.Vector3(0.1,1.0,0.05), 2.2, 0.25, 1.6, 0x6f6a63, 0xb8b3ab, {drag:0.6, a:0.45}); } }
     const v = p.obj.userData.sv || 0, nv = v + ((act?4.2:0)-v)*Math.min(1, dt*(act?1.1:0.7));
     p.obj.userData.sv = nv; if(nv > 0.02) sp.rotation.y += nv*dt;
   });
@@ -1986,7 +1989,7 @@ const TOOL_POSE = {
   pickaxe: { pos:new THREE.Vector3( 0.30,-0.34,-0.52), rot:new THREE.Euler(-0.10,-0.06, 0.03) },
   hammer:  { pos:new THREE.Vector3( 0.26,-0.34,-0.55), rot:new THREE.Euler(-0.10, 0.55, 0.00) },   // повёрнута на 90° вправо (крен по часовой)
   spear:   { pos:new THREE.Vector3( 0.30,-0.36,-0.50), rot:new THREE.Euler(-1.00,-0.10, 0.06) },
-  knife:   { pos:new THREE.Vector3( 0.24,-0.30,-0.44), rot:new THREE.Euler(-1.15, 0.10,-0.10) },
+  knife:   { pos:new THREE.Vector3( 0.14,-0.19,-0.42), rot:new THREE.Euler(-0.98, 0.00,-0.12) },
   rifle:   { pos:new THREE.Vector3( 0.14,-0.19,-0.36), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
   berdanka:{ pos:new THREE.Vector3( 0.14,-0.20,-0.40), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
   smg:     { pos:new THREE.Vector3( 0.14,-0.19,-0.38), rot:new THREE.Euler( 0.00, 0.00, 0.00) },
@@ -2000,7 +2003,7 @@ let toolKind = 'none';
 
 /* ---- Тайминги (как в Rust: замах → удар → отдача; между ударами — кулдаун) ---- */
 const SWING_DUR = 0.88;   // полная длительность удара = кулдаун между ударами, с
-const SWING_KNIFE = 0.46;   // нож бьёт быстрее остальных
+const SWING_KNIFE = 0.8;   // нож: удар втрое медленнее прежнего
 const curSwingDur = ()=> toolKind==='knife' ? SWING_KNIFE : SWING_DUR;
 const HIT_AT    = 0.57;   // на какой доле анимации удар «попадает» в цель
 const EQUIP_DUR = 0.60;   // доставание предмета из-за нижнего края экрана
@@ -2035,10 +2038,20 @@ function sampleSwing(t){
   }
   return o;
 }
+/* ---- осмотр предмета в руках: короткая анимация, кулдаун от спама ---- */
+const INSPECT_DUR = 1.7, INSPECT_CD = 2.8;
+let inspectT = -1, inspectLock = 0;
+function inspectItem(){
+  const now = performance.now()/1000;
+  if(now < inspectLock || inspectT >= 0 || toolKind==='none' || !currentToolMesh) return;
+  if(swinging || equipT < 1 || aimOn || aimHeld || reloadT >= 0 || panelsOpen() || (typeof copter!=='undefined' && copter.pilot)) return;
+  inspectT = 0; inspectLock = now + INSPECT_CD;
+}
 function triggerSwing(){
   if(window.OSIL_NET) OSIL_NET.onSwing();
   playerModel.swing=1;
   if(swinging) return false;
+  inspectT = -1;
   swinging = true; swingT = 0;
   return true;
 }
@@ -2147,6 +2160,17 @@ function updateViewmodel(dt){
     }
   }
   // отдача: импульс в пружины → кирка отскакивает, тяжело «оседает» и затухает
+  if(inspectT >= 0){
+    if(swinging || equipT < 1 || aimK > 0.05 || reloadT >= 0){ inspectT = -1; }
+    else {
+      inspectT += dt/INSPECT_DUR; const u = Math.min(1, inspectT);
+      if(u >= 1) inspectT = -1;
+      else {                                   // один плавный поворот туда-обратно, без движения к камере
+        const e = Math.sin(Math.PI*u), kk = isMag(toolKind) ? 0.55 : 1;
+        ry += 0.7*e*kk; rz += 0.22*e*kk; rx += -0.12*e; dy += 0.02*e; dx += -0.03*e*kk;
+      }
+    }
+  }
   if(hitNow){
     const sg = Math.random() < 0.5 ? -1 : 1;
     VM.z[1] += 0.9; VM.y[1] += 0.35; VM.rx[1] += 1.4; VM.rz[1] += sg*1.0; VM.ry[1] += -sg*0.5; VM.x[1] += sg*0.15;
@@ -2360,6 +2384,7 @@ function addItem(k, n, dur){
 }
 /* убрать n штук (сначала из сетки, потом из пояса; из самых неполных стаков). Возвращает сколько убрано. */
 function removeItem(k, n){
+  if(window.__tester && ITEM_DEFS[k] && /^(res|comp|food)$/.test(ITEM_DEFS[k].kind)) return n;   // TESTER: ресурсы не тратятся
   let left=n;
   const refs=allSlotRefs().filter(r=>{const s=getAt(r);return s&&s.k===k;})
     .sort((a,b)=> getAt(a).n-getAt(b).n || (a.t==='g'?-1:1));
@@ -2468,7 +2493,7 @@ function _qMats(){
   if(_qMats.c) return _qMats.c;
   const OM=(window.OSIL_TOOLS&&OSIL_TOOLS.materials)||{}, env=OM.wood?OM.wood.envMap:null;
   const T={plank:loadTex(TEXTURES.tex_plank,1,1), stone:loadTex(TEXTURES.tex_stone,1,1), rock:loadTex(TEXTURES.tex_rockore,1,1)};
-  const M=(o,ei)=>new THREE.MeshStandardMaterial(Object.assign({envMap:env, envMapIntensity:ei===undefined?0.8:ei},o));
+  const M=(o,ei)=>{ const d={color:o.color}; if(o.map) d.map=o.map; if(o.flatShading) d.flatShading=true; return new THREE.MeshLambertMaterial(d); };   // дешёвый шейдер: у карьера съедал FPS на заполнении экрана
   return _qMats.c = {
     steel:M({color:0x4d5359,roughness:0.42,metalness:0.92}), dark:M({color:0x1f2226,roughness:0.6,metalness:0.8}),
     rust:M({color:0x8a4b2a,roughness:0.72,metalness:0.55},0.5), red:M({color:0x8f2a1d,roughness:0.5,metalness:0.4}),
@@ -2488,7 +2513,7 @@ function createQuarry(){      // карьер: каменное основани
   let sd = 7; const rnd = ()=>{ sd = (sd*16807)%2147483647; return sd/2147483647; };
   const DX = -0.2;
   add(stat,B(5.0,0.9,3.6),Q.stone, 0,-0.2,0);                                  // каменное основание
-  for(let i=0;i<14;i++){ const a=i/14*Math.PI*2, ex=Math.cos(a)*2.6, ez=Math.sin(a)*1.9, r=0.28+rnd()*0.3;   // валуны по периметру
+  for(let i=0;i<9;i++){ const a=i/9*Math.PI*2, ex=Math.cos(a)*2.6, ez=Math.sin(a)*1.9, r=0.28+rnd()*0.3;   // валуны по периметру
     const o = add(stat,new THREE.DodecahedronGeometry(r,0),Q.rock, ex,0.0+r*0.2,ez, rnd()*3,rnd()*3,rnd()*3); o.scale.set(1,0.7+rnd()*0.3,1); }
   for(let i=0;i<12;i++) add(stat,B(0.38,0.1,3.1),i&1?Q.woodD:Q.wood, -2.2+i*0.4,0.3,0);     // дощатая палуба
   [-1.6,1.6].forEach(z=> add(stat,B(4.8,0.12,0.14),Q.steel, 0,0.38,z));          // стальные кромки
@@ -2519,6 +2544,8 @@ function createQuarry(){      // карьер: каменное основани
   mergeGroupByMaterial(stat); mergeGroupByMaterial(spin);
   g.add(stat); g.add(spin); g.userData.spin = spin;
   g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  g.traverse(o=>{ if(o.isMesh) o.receiveShadow = false; });
+  spin.traverse(o=>{ if(o.isMesh){ o.castShadow = false; o.receiveShadow = false; } });   // вращающийся бур не гоняем через теневой проход: меньше нагрузки рядом с карьером
   return g;
 }
 function createFurnace(){     // глиняная печь на каменном основании с огнём в устье; перёд — +Z
@@ -2591,7 +2618,7 @@ const CRAFT_RECIPES = [
   { id:'axe',     cat:'tools', name:'Каменный топор', desc:'Хорошо рубит деревья. Каждый крафт даёт новый топор.', icon:ITEM_DEFS.axe.icon,     time:5,  cost:{wood:30},            give:{tool:'axe'} },
   { id:'pickaxe', cat:'tools', name:'Каменная кирка', desc:'Добывает камень, железную и серную руду (руду плавят в печке).',          icon:ITEM_DEFS.pickaxe.icon, time:5,  cost:{wood:20,stone:20},   give:{tool:'pickaxe'} },
   { id:'spear',   cat:'weapons', name:'Копьё',        desc:'Простое оружие ближнего боя.',            icon:ITEM_DEFS.spear.icon,   time:8,  cost:{wood:40,stone:15},   give:{tool:'spear'} },
-  { id:'knife',   cat:'weapons', name:'Боевой нож',   desc:'Быстрое оружие ближнего боя: 28 урона, удары вдвое чаще копья.', icon:ITEM_DEFS.knife.icon, time:6, cost:{metal:30,wood:10}, give:{tool:'knife'} },
+  { id:'knife',   cat:'weapons', name:'Боевой нож',   desc:'Оружие ближнего боя: 28 урона, удары чащее копья.', icon:ITEM_DEFS.knife.icon, time:6, cost:{metal:30,wood:10}, give:{tool:'knife'} },
   { id:'rifle',  cat:'weapons', name:'Штурмовая винтовка', desc:'Автоматическая винтовка. Зажмите «Удар» для стрельбы. Нужны винтовочные патроны.', icon:ITEM_DEFS.rifle.icon, time:25, cost:{metal:120,pipe:2,gear:2,wood:60}, give:{tool:'rifle'} },
   { id:'berdanka', cat:'weapons', name:'Полуавтоматическая винтовка', desc:'Полуавтоматическая винтовка. Магазин 15, винтовочные патроны, урон 35, в голову ×2.', icon:ITEM_DEFS.berdanka.icon, time:30, cost:{metal:150,pipe:3,gear:3,wood:80}, give:{tool:'berdanka'} },
   { id:'satchel', cat:'weapons', name:'Сатчел-заряд', desc:'Бросьте в стену или дверь: прилипнет, 10 писков, затем взрыв — 75 урона детали.', icon:ITEM_DEFS.satchel.icon, time:40, cost:{cloth:80,gunpowder:25,metal:100,pipe:2,gear:1}, give:{item:'satchel', amount:1} },
@@ -2634,7 +2661,7 @@ function findSlots(k){ return allSlotRefs().concat(equipRefs()).filter(r=>{const
 let ADMIN_FREE = false;
 try{ ADMIN_FREE = localStorage.getItem('osil_admin')==='1'; }catch(e){}
 function adminGrantRes(){ ['wood','stone','metal'].forEach(k=>{ const n=1000-countItem(k); if(n>0) addItem(k,n); }); }   // докидывает до 1000
-function adminFree(){ return ADMIN_FREE || !!(window.OSIL_ACC && OSIL_ACC.isAdmin && OSIL_ACC.isAdmin()); }   // локальный промокод ИЛИ админ на сервере   // промокод Admin6737: +1000 дерева, камня, железа
+function adminFree(){ return ADMIN_FREE || !!window.__tester || !!(window.OSIL_ACC && OSIL_ACC.isAdmin && OSIL_ACC.isAdmin()); }   // локальный промокод ИЛИ админ на сервере   // промокод Admin6737: +1000 дерева, камня, железа
 if(ADMIN_FREE) adminGrantRes();
 window.OSIL_ADMIN = { ok(){ return ADMIN_FREE && !(window.OSIL_NET && OSIL_NET.on); }, setTime(f){ gameClock = ((f%1)+1)%1*CYCLE_LEN; skyTimer = 99; }, getTime(){ return gameClock/CYCLE_LEN; } };
 const DONATE_ITEMS = ['copter','quarry','eod_suit'];
@@ -3633,7 +3660,7 @@ function updateDoorPrompt(){
   if(best){
     const o = document.getElementById('dp-open'), l = document.getElementById('dp-lock');
     const locked = best.locked && !isAuthed(best);
-    const to = '🔒 ВВЕСТИ КОД'; o.style.display = locked ? '' : 'none';
+    const to = 'ВВЕСТИ КОД'; o.style.display = locked ? '' : 'none';
     const tl = best.locked ? 'СНЯТЬ ЗАМОК' : 'ПОСТАВИТЬ ЗАМОК';
     if(o.textContent !== to) o.textContent = to; if(l.textContent !== tl) l.textContent = tl;
     l.style.display = locked ? 'none' : '';
@@ -3662,6 +3689,7 @@ window.addEventListener('keydown', e=>{
   if(e.code==='KeyR' && buildMode){ rotateBuild(); }
   else if(e.code==='KeyR' && isMag(toolKind)){ startReload(); }
   if(e.code==='KeyM'){ toggleMap(); }
+  if(e.code==='KeyY' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')) inspectItem();
 });
 window.addEventListener('keyup', e=>{ keys[e.code]=false; });
 
@@ -3775,6 +3803,10 @@ function jump(){
   const ba = document.getElementById('btn-aim'), br = document.getElementById('btn-reload');
   if(ba) ba.addEventListener('pointerdown', e=>{ e.preventDefault(); if(isMag(toolKind)){ aimOn = !aimOn; ba.classList.toggle('active', aimOn); } });
   if(br) br.addEventListener('pointerdown', e=>{ e.preventDefault(); startReload(); });
+})();
+(function(){ const bi = document.getElementById('btn-inspect'); if(!bi) return;
+  bi.addEventListener('pointerdown', e=>{ e.preventDefault(); inspectItem(); });
+  setInterval(()=>{ const on = toolKind!=='none' && !!currentToolMesh && !buildMode && !(typeof copter!=='undefined' && copter.pilot); bi.style.display = on ? 'flex' : 'none'; bi.classList.toggle('active', inspectT>=0); }, 250);
 })();
 let runOn = false;
 (function(){ const b = document.getElementById('btn-run'); if(!b) return;
@@ -4390,6 +4422,11 @@ function updateFPS(now){
       fpsEl.textContent = fps + ' FPS';
     }
     fpsFrames = 0; fpsLast = now;
+    if(CFG.ultra && !document.hidden){          // УЛЬТРА: подстраиваем разрешение так, чтобы держать 60 FPS
+      if(fps < 55){ ultraLo++; ultraHi = 0; if(ultraLo >= 2 && CFG.res + ultraDyn > 35){ ultraDyn -= 5; ultraLo = 0; applySetting('res'); } }
+      else if(fps >= 59){ ultraHi++; ultraLo = 0; if(ultraHi >= 8 && ultraDyn < 0){ ultraDyn += 5; ultraHi = 0; applySetting('res'); } }
+      else { ultraLo = ultraHi = 0; }
+    }
   }
 }
 
@@ -4510,7 +4547,7 @@ function renderInvDetail(){
   if(SIGHT_GUNS.includes(sl.k)){
     const has = !!sl.s, can = countItem('holo_sight')>0;
     extra += '<div class="idt-sub">Прицел: '+(has?'голографический':'нет')+'</div>'+
-      '<button onclick="sightToggle()" style="margin-top:6px;width:100%;padding:7px 8px;border-radius:7px;border:1px solid #9db07a;background:'+((has||can)?'rgba(88,110,60,.95)':'rgba(70,68,62,.9)')+';color:#fff;font-size:13px">'+(has?'Снять прицел':(can?'Установить прицел':'Нет прицела'))+'</button>';
+      '<button onclick="sightToggle()" style="margin-top:6px;width:100%;padding:7px 8px;border:1px solid #9db07a;background:'+((has||can)?'rgba(96,130,50,.95)':'rgba(70,68,62,.9)')+';color:#fff;font:600 12px var(--rf,sans-serif);letter-spacing:.8px">'+(has?'СНЯТЬ ПРИЦЕЛ':(can?'УСТАНОВИТЬ ПРИЦЕЛ':'НЕТ ПРИЦЕЛА'))+'</button>';
   }
   if(sl.k==='eod_suit') extra += '<div class="idt-sub">Урон −75% · бег запрещён · описание: тяжёлая сапёрная броня со шлемом</div>';
   if(sl.k==='holo_sight') extra += '<div class="idt-sub">Выберите оружие в инвентаре и нажмите «Установить прицел»</div>';
@@ -4518,8 +4555,8 @@ function renderInvDetail(){
     '<div class="idt-head">'+def.name+'</div>'+
     '<div class="idt-body">'+(icon?'<img src="'+icon+'" alt="">':'')+'<div class="idt-cnt">'+info+'</div></div>'+extra+
     '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
-      '<button style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid #9db07a;background:rgba(88,86,78,.95);color:#fff;font-size:13px" onclick="window.OSIL_NET&&OSIL_NET.drop(0)">'+((def.stack>1 && sl.n>1)?'Выбросить 1':'Выбросить')+'</button>'+
-      ((def.stack>1 && sl.n>1)?'<button style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid #9db07a;background:rgba(88,86,78,.95);color:#fff;font-size:13px" onclick="window.OSIL_NET&&OSIL_NET.drop(1)">Выбросить всё</button>':'')+
+      '<button style="flex:1;padding:7px 8px;border:1px solid #9db07a;background:rgba(34,33,31,.92);color:#fff;font:600 12px var(--rf,sans-serif);letter-spacing:.8px" onclick="window.OSIL_NET&&OSIL_NET.drop(0)">'+((def.stack>1 && sl.n>1)?'ВЫБРОСИТЬ 1':'ВЫБРОСИТЬ')+'</button>'+
+      ((def.stack>1 && sl.n>1)?'<button style="flex:1;padding:7px 8px;border:1px solid #9db07a;background:rgba(34,33,31,.92);color:#fff;font:600 12px var(--rf,sans-serif);letter-spacing:.8px" onclick="window.OSIL_NET&&OSIL_NET.drop(1)">ВЫБРОСИТЬ ВСЁ</button>':'')+
     '</div>';
 }
 function renderQuickCraft(){
@@ -4859,7 +4896,7 @@ document.getElementById('pm-exit').addEventListener('click', ()=>{
 
 /* ---------------- Расположение управления (перетаскивание) ---------------- */
 const LAYOUT_KEY = 'osil_layout_v1';
-const LAYOUT_IDS = ['btn-hit','btn-aim','btn-reload','btn-jump','btn-run','btn-crouch','btn-inv','btn-craft','btn-map','btn-pause','ammo-hud','hotbar','hud-bars','minimap','fps-counter'];
+const LAYOUT_IDS = ['btn-inspect','btn-hit','btn-aim','btn-reload','btn-jump','btn-run','btn-crouch','btn-inv','btn-craft','btn-map','btn-pause','ammo-hud','hotbar','hud-bars','minimap','fps-counter'];
 let layoutData = {};
 try{ layoutData = JSON.parse(localStorage.getItem(LAYOUT_KEY)||'{}') || {}; }catch(e){ layoutData = {}; }
 function saveLayout(){ try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutData)); }catch(e){} }
@@ -4922,7 +4959,7 @@ function endLayout(){
   updateFpsVisibility();
 }
 /* раскладка «как на фото»: центры элементов в долях экрана 960×449 */
-const PHOTO_LAYOUT = {'btn-pause':[692,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],'btn-run':[771,222],'btn-jump':[802,329],'btn-crouch':[876,396],
+const PHOTO_LAYOUT = {'btn-pause':[689,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],'btn-run':[771,222],'btn-jump':[802,329],'btn-crouch':[876,396],
   'hud-bars':[108,47],'hotbar':[480,413],'fps-counter':[232,14],'minimap':[262,74],'btn-hit':[722,329],'btn-aim':[640,300],'btn-reload':[640,230],'ammo-hud':[737,419]};
 function applyPhotoLayout(){
   const W = window.innerWidth, H = window.innerHeight; layoutData = {};
@@ -6491,9 +6528,10 @@ function applyShadowFilter(){
 function applySetting(k){
   const all = (k===null||k===undefined), on = n => all || k===n;
   if(on('res')){
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 3) * CFG.res/100);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 3) * Math.max(35, CFG.res + (CFG.ultra ? ultraDyn : 0))/100);
     fitScreen();
   }
+  if(on('ultra')){ ultraDyn = 0; ultraLo = ultraHi = 0; if(!all) applySetting('res'); }
   if(on('texQ')||on('aniso')) applyTextures();
   if(on('shadowFilter')) applyShadowFilter();
   if(on('waterQ')) applySeaQuality();
@@ -6635,12 +6673,12 @@ window.OSIL_NET = (function(){
     nearBag = playing ? best : null;
     if(!pickEl){
       pickEl = document.createElement('div');
-      pickEl.style.cssText = 'position:fixed;left:50%;bottom:calc(260px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:16;padding:12px 20px;border-radius:12px;border:1px solid #d9a441;background:rgba(30,28,22,.92);color:#ffe9a8;font:bold 16px sans-serif;display:none;user-select:none;-webkit-user-select:none';
+      pickEl.style.cssText = 'position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:16;padding:10px 16px;border:none;background:rgba(34,33,31,.86);color:#fff;font:600 12px/1 var(--rf,sans-serif);letter-spacing:.8px;display:none;user-select:none;cursor:pointer';
       pickEl.addEventListener('touchstart', e => { e.preventDefault(); pickup(); }, {passive:false}); pickEl.addEventListener('click', pickup);
       document.body.appendChild(pickEl);
       window.addEventListener('keydown', e => { if(e.code === 'KeyE' && nearBag && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName || '')) pickup(); });
     }
-    if(nearBag){ pickEl.style.display = 'block'; pickEl.textContent = '🎒 Подобрать: ' + (RES_NAMES[nearBag.k] || nearBag.k) + (nearBag.n > 1 ? ' ×' + nearBag.n : '') + '  [E]'; }
+    if(nearBag){ pickEl.style.display = 'block'; pickEl.textContent = 'ПОДОБРАТЬ: ' + String(RES_NAMES[nearBag.k] || nearBag.k).toUpperCase() + (nearBag.n > 1 ? ' ×' + nearBag.n : ''); }
     else pickEl.style.display = 'none';
   }
   function profile(){ return {t:'pf', hp:r2(player.hp), hu:r2(player.hunger), th:r2(player.thirst), st:r2(player.stamina), g:gridSlots, h:hotbarSlots, e:equip}; }
@@ -6671,11 +6709,14 @@ window.OSIL_NET = (function(){
         authKeys.clear(); (m.auth||[]).forEach(k=>authKeys.add(k));
         (m.locks||[]).forEach(k=>{ const d=doors.get(k); if(d){ d.locked=true; refreshDoorPad(d); } });
         clearBags(true); (m.bags||[]).forEach(addBag);
+        Object.keys(m.cops||{}).forEach(un=>{ const c = m.cops[un];     // коптеры хранятся на сервере: свой возвращается в мир, чужие стоят на месте
+          if(un === m.you){ if(copter.grp && !copter.exists){ Object.assign(copter,{exists:true,hp:100,hitT:0,x:c.x,z:c.z,y:c.y,vx:0,vz:0,vy:0,spool:0,col:0,thr:0,pilot:false,hdg:c.r,yaw:c.r}); copter.grp.visible = true; copter.grp.position.set(c.x,c.y,c.z); copter.grp.rotation.set(0,c.r,0); } }
+          else if(copter.grp){ const key = 'u:'+un; if(!rcops.has(key)){ const g2 = copter.grp.clone(true); g2.visible = true; let hub = null; g2.traverse(o => { if(o.userData && o.userData.isHub) hub = o; }); scene.add(g2); g2.position.set(c.x,c.y,c.z); g2.rotation.y = c.r; rcops.set(key,{g:g2,hub,t:performance.now(),st:true,tx:c.x,ty:c.y,tz:c.z,tr:c.r,tq:0,tw:0,p:0}); } } });
         toast('Подключено: '+srvName); hud(); chat('', 'Вы на сервере «'+srvName+'». Enter — чат.'); break;
       case 'full': toast('Сервер заполнен'); disconnect(); break;
       case 'auth': { const s = curSrv; if(s) authSet(s, null); disconnect(); if(s) showAuth(s, 'Сессия истекла — войдите заново', () => connect(s)); break; }
       case 'kick': toast(m.m || 'Вы отключены'); disconnect(); break;
-      case 'pj': if(!remotes.has(m.id)) remotes.set(m.id, makeAvatar(m.id,m.n)); hud(); break;
+      case 'pj': if(!remotes.has(m.id)) remotes.set(m.id, makeAvatar(m.id,m.n)); { const sc = rcops.get('u:'+m.n); if(sc){ scene.remove(sc.g); rcops.delete('u:'+m.n); } } hud(); break;
       case 'pl': removeRemote(m.id); { const rc = rcops.get(m.id); if(rc){ scene.remove(rc.g); rcops.delete(m.id); } } hud(); break;
       case 'bs': boarSnap(m.b); break;
       case 'zd': if(!window.__BOAR_GUEST()){ const bb = boars[m.i]; if(bb) boarDamage(bb, m.d); } break;
@@ -6859,7 +6900,8 @@ window.OSIL_NET = (function(){
       let r; try{ r = await fetch(c.url+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({token:c.tok}, body||{}))}); }
       catch(e){ return {error:'Сервер недоступен ('+c.url+')'}; }
       try{ return await r.json(); }catch(e){ return {error: r.status===404 ? 'Сервер не обновлён: загрузите новый server.py и перезапустите' : 'Ошибка ответа сервера ('+r.status+')'}; } },
-    async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l) l.textContent = d.level; if(d.admin && !this._ag){ this._ag = 1; try{ adminGrantRes(); updateResourceUI(); renderCraftUI(); }catch(e){} } } return d; },
+    async refresh(){ const d = await this.call('/api/me'); if(d && d.u){ this.me = d; mCoins = d.coins; window.__tester = !!d.tester; const c = document.getElementById('m-pCoins'), l = document.getElementById('m-pLvl'); if(c) c.textContent = d.coins; if(l){ l.textContent = d.level; const sp = Math.max(1, (d.xpmax||1) - (d.xpmin||0)); l.style.setProperty('--p', Math.max(0, Math.min(100, ((d.xp||0) - (d.xpmin||0)) / sp * 100))); } if(d.tester && !this._tg){ this._tg = 1; setInterval(()=>{ try{ ['wood','stone','metal','scrap','fuel','sulfur'].forEach(k=>{ const n=1000-countItem(k); if(n>0) addItem(k,n); }); updateResourceUI(); }catch(e){} }, 4000); }
+      if(d.admin && !this._ag){ this._ag = 1; try{ adminGrantRes(); updateResourceUI(); renderCraftUI(); }catch(e){} } } return d; },
     isAdmin(){ return !!(this.me && this.me.admin); },
     owns(id){ return !!(this.me && (this.me.items||[]).includes(id)); }
   };
@@ -7040,9 +7082,9 @@ window.OSIL_NET = (function(){
     if(!m.e){ if(rc){ scene.remove(rc.g); rcops.delete(m.id); } return; }
     if(!rc){ const g = copter.grp.clone(true); g.visible = true; let hub = null; g.traverse(o => { if(o.userData && o.userData.isHub) hub = o; });
       scene.add(g); g.position.set(m.x, m.y, m.z); rc = {g, hub, t:performance.now()}; rcops.set(m.id, rc); }
-    rc.tx = m.x; rc.ty = m.y; rc.tz = m.z; rc.tr = m.r; rc.tq = m.q || 0; rc.tw = m.w || 0; rc.p = m.p; rc.t = performance.now(); }
+    rc.tx = m.x; rc.ty = m.y; rc.tz = m.z; rc.tr = m.r; rc.tq = m.q || 0; rc.tw = m.w || 0; rc.p = m.p; rc.t = performance.now(); rc.st = false; }
   setInterval(() => { const now = performance.now(); rcops.forEach((rc, id) => {
-    if(now - rc.t > 5000 || !on){ scene.remove(rc.g); rcops.delete(id); return; }
+    if((!rc.st && now - rc.t > 5000) || !on){ scene.remove(rc.g); rcops.delete(id); return; }
     const g = rc.g, k = 0.3; g.position.x += (rc.tx - g.position.x) * k; g.position.y += (rc.ty - g.position.y) * k; g.position.z += (rc.tz - g.position.z) * k;
     let d = rc.tr - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g.rotation.y += d * k; g.rotation.x = rc.tq; g.rotation.z = rc.tw;
     if(rc.hub && rc.p) rc.hub.rotation.y += 0.9; }); }, 33);

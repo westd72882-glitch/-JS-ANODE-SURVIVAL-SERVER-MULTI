@@ -3,9 +3,9 @@
 window.OSIL_LOADER=(function(){
   const TIPS=['Топор быстрее рубит деревья, кирка — камень, серу и металл.','Тыквы на земле подбираются на ходу — они утоляют голод.','Зайдите в воду пруда, чтобы напиться.','Жареное мясо утоляет голод и лечит: выберите его в поясе и нажмите «Удар».','У топора и кирки есть прочность — следите за полоской в слоте. Сломанный инструмент придётся создать заново.','Между ударами есть пауза: не спамьте кнопку, а зажмите её — удары пойдут сами.','Перетаскивайте предметы из инвентаря на пояс, чтобы взять их в руки.','Присед (C) снижает скорость, но помогает целиться и прятаться.','Ночью в лесу воют хищники — держитесь ближе к базе.'];
   const el=document.createElement('div'); el.id='loading-screen';
-  el.innerHTML='<div class="ld-bg"></div><div class="ld-box"><div class="ld-title">ANODE<span>SURVIVAL</span></div>'+
-    '<div class="ld-stage" id="ld-stage">Подготовка…</div><div class="ld-bar"><i id="ld-fill"></i></div>'+
-    '<div class="ld-row"><span id="ld-file"></span><b id="ld-pct">0%</b></div><div class="ld-tip" id="ld-tip"></div></div>';
+  el.innerHTML='<div class="ld-bg"></div><div class="ld-logo"><img src="1/icon-192.png" alt=""><div><div class="t1">ANODE</div><div class="t2">SURVIVAL ISLAND</div></div></div>'+
+    '<div class="ld-spin"></div><div class="ld-txt">ЗАГРУЗКА</div>'+
+    '<div style="display:none"><span id="ld-stage"></span><i id="ld-fill"></i><span id="ld-file"></span><b id="ld-pct"></b><div id="ld-tip"></div></div>';
   document.body.appendChild(el);
   const $=id=>document.getElementById(id);
   let tipT=null;

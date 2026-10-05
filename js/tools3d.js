@@ -347,12 +347,6 @@ window.OSIL_TOOLS = (function(){
     tube(curve, rfn, 28, 14, M.skin, parent);
     ball(pts[0], fr*1.13, M.skin, parent, 1, 1, 0.95);                    // костяшка (MCP)
     const pe = curve.getPoint(1); ball(pe, rfn(1)*0.98, M.skin, parent, 1, 0.95, 1);
-    { const tgE = curve.getTangent(1), nn = new T.Vector3(pe.x,0,pe.z); if(nn.lengthSq() < 1e-8) nn.set(1,0,0); nn.normalize(); nn.addScaledVector(tgE, -nn.dot(tgE)).normalize();
-      const bb = new T.Vector3().crossVectors(nn, tgE).normalize(), r1 = rfn(1);
-      const nl = new T.Mesh(new T.SphereGeometry(1,12,8), M.nail);
-      nl.scale.set(r1*0.64, r1*0.2, r1*0.9);
-      nl.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(bb, nn, tgE));
-      nl.position.copy(pe).addScaledVector(nn, r1*0.74).addScaledVector(tgE, -r1*0.22); parent.add(nl); }
     joints.forEach(j=>{
       const p = curve.getPoint(j), tg = curve.getTangent(j);
       const n = new T.Vector3(p.x,0,p.z).normalize(); n.addScaledVector(tg, -n.dot(tg)).normalize();
@@ -1269,8 +1263,9 @@ window.OSIL_TOOLS = (function(){
     for(let i=0;i<=60;i++){ const y = 0.004 + (gl-0.004)*i/60; gp.push(new T.Vector2(0.0262 + 0.0018*Math.sin(PI*y/gl) + 0.0013*Math.max(0, Math.sin(y*270)), y)); }
     gp.push(new T.Vector2(0.0292, gl+0.002)); gp.push(new T.Vector2(0.0001, gl+0.002));
     g.add(new T.Mesh(new T.LatheGeometry(gp, 28), M.rubber));
-    const guard = new T.Mesh(new T.BoxGeometry(0.015,0.016,0.070), M.dark); guard.position.set(0,gl+0.010,0); g.add(guard);
-    const ring = new T.Mesh(new T.TorusGeometry(0.0165,0.0034,8,22), M.dark); ring.rotation.y = PI/2; ring.position.set(0,gl+0.012,0.050); g.add(ring);
+    const bl = new T.Group(); bl.rotation.y = -PI/2; g.add(bl);   // клинок, гарда и кольцо повёрнуты плашмя к камере, кольцо смотрит в сторону центра
+    const guard = new T.Mesh(new T.BoxGeometry(0.015,0.016,0.070), M.dark); guard.position.set(0,gl+0.010,0); bl.add(guard);
+    const ring = new T.Mesh(new T.TorusGeometry(0.0165,0.0034,8,22), M.dark); ring.rotation.y = PI/2; ring.position.set(0,gl+0.012,0.050); bl.add(ring);
     const sb = -0.011, eb = 0.023, L = 0.215, s = new T.Shape();
     s.moveTo(sb,0); s.lineTo(sb,0.03);
     for(let i=0;i<7;i++){ const y0 = 0.03 + i*0.0135; s.lineTo(sb-0.0048,y0+0.0015); s.lineTo(sb,y0+0.0135); }
@@ -1279,8 +1274,8 @@ window.OSIL_TOOLS = (function(){
     const hole = new T.Path(); hole.absellipse(0.006,0.168,0.0034,0.0075,0,PI*2,false,0); s.holes.push(hole);
     const geo = new T.ExtrudeGeometry(s, {depth:0.0046, steps:1, bevelEnabled:true, bevelThickness:0.0007, bevelSize:0.0007, bevelSegments:1, curveSegments:14});
     geo.translate(0,0,-0.0023); geo.rotateY(PI/2);
-    const blade = new T.Mesh(geo, M.metal); blade.position.y = gl+0.018; g.add(blade);
-    const fuller = new T.Mesh(new T.BoxGeometry(0.0054,0.115,0.0042), M.dark); fuller.position.set(0,gl+0.018+0.105,-0.0035); g.add(fuller);
+    const blade = new T.Mesh(geo, M.metal); blade.position.y = gl+0.018; bl.add(blade);
+    const fuller = new T.Mesh(new T.BoxGeometry(0.0054,0.115,0.0042), M.dark); fuller.position.set(0,gl+0.018+0.105,-0.0035); bl.add(fuller);
     const hR = makeHand(1, 0.072); g.add(hR);
     const aR = makeArm(1); aR.userData.wristLocal = hR.userData.wrist.clone(); aR.userData.hand = hR;
     g.userData.arms = [aR]; g.userData.hands = [hR];

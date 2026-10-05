@@ -6,7 +6,7 @@ window.OSIL_SETTINGS=(function(){
     sens:10, invertY:false, joySize:100, btnSize:100,
     res:100, lighting:1, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:3, dist:200, fov:75, bob:100, water:true,
     volMaster:10, volSfx:10, volMusic:10, volSteps:10,
-    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0
+    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0, ultra:false
   };
   const all=Object.assign({},DEF);
   try{ if(!localStorage.getItem('osil_res_fix')){ localStorage.setItem('osil_res_fix','1'); } }catch(e){}
@@ -20,6 +20,13 @@ window.OSIL_SETTINGS=(function(){
   function emit(k){ subs.forEach(f=>{ try{ f(k,all[k],all); }catch(e){ console.error(e); } }); }
   function set(k,v){ all[k]=v; save(); emit(k); }
   function onChange(f){ subs.push(f); }
+  const ULTRA={res:55,shadows:0,shadowDist:30,dist:90,lighting:0,shadowFilter:0,texQ:1,aniso:0,waterQ:0,water:false,particles:false,bob:50,fpsCap:1};
+  function ultraApply(v){
+    if(v){ try{ if(!localStorage.getItem('osil_ultra_bak')){ const b={}; Object.keys(ULTRA).forEach(k=>b[k]=all[k]); localStorage.setItem('osil_ultra_bak',JSON.stringify(b)); } }catch(e){}
+      Object.keys(ULTRA).forEach(k=>{ all[k]=ULTRA[k]; }); all.ultra=true; save(); emit(null); }
+    else { try{ const b=JSON.parse(localStorage.getItem('osil_ultra_bak')||'null'); if(b) Object.keys(b).forEach(k=>{ all[k]=b[k]; }); localStorage.removeItem('osil_ultra_bak'); }catch(e){}
+      all.ultra=false; save(); emit(null); }
+  }
   function reset(){ for(const k in DEF) all[k]=DEF[k]; save(); emit(null); }
 
   const TABS=[
@@ -35,6 +42,7 @@ window.OSIL_SETTINGS=(function(){
       {t:'action',n:'Расположение как на фото (по умолчанию)',label:'ПРИМЕНИТЬ',fn:'reset'}
     ]},
     {id:'gfx',name:'Графика',rows:[
+      {k:'ultra',t:'toggle',n:'УЛЬТРА-ОПТИМИЗАЦИЯ · 60 FPS',d:'Максимальная скорость на любом устройстве: минимальные тени, вода и частицы, меньше дальность, а разрешение само подстраивается под 60 FPS. Выключите — прежние настройки вернутся'},
       {t:'head',n:'Качество'},
       {t:'head',n:'Освещение и тени'},
       {k:'lighting',t:'seg',n:'Освещение',d:'Статическое — тени обновляются по событию (быстрее). Динамическое — тени пересчитываются каждый кадр (плавнее, дороже)',opts:['Статическое','Динамическое']},
@@ -181,7 +189,7 @@ window.OSIL_SETTINGS=(function(){
         ctl.appendChild(inp); ctl.appendChild(val);
       } else if(r.t==='toggle'){
         const b=document.createElement('button'); b.className='set-tg'+(all[r.k]?' on':''); b.textContent=all[r.k]?'ВКЛ':'ВЫКЛ';
-        b.addEventListener('click',()=>{ const v=!all[r.k]; set(r.k,v); b.classList.toggle('on',v); b.textContent=v?'ВКЛ':'ВЫКЛ'; });
+        b.addEventListener('click',()=>{ const v=!all[r.k]; if(r.k==='ultra'){ ultraApply(v); render(); return; } set(r.k,v); b.classList.toggle('on',v); b.textContent=v?'ВКЛ':'ВЫКЛ'; });
         ctl.appendChild(b);
       } else if(r.t==='seg'){
         const w=document.createElement('div'); w.className='set-seg';
