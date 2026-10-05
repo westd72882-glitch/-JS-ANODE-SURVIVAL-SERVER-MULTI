@@ -3,6 +3,11 @@ name: Build APK
 # Для подписи release: секреты KEYSTORE_BASE64 и KEYSTORE_PASSWORD (алиас ключа: anode). Без них соберётся debug-APK.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия игры (должна совпадать с version в serverconfig.txt сервера)'
+        required: false
+        default: '1.0.0'
   push:
     branches: [main, master]
 jobs:
@@ -16,10 +21,13 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - name: Сборка веб-части (обфускация, шифрование ресурсов и кода)
         env:
+          APP_VERSION: ${{ github.event.inputs.version || vars.APP_VERSION || '1.0.0' }}
           SERVER_URL: ${{ vars.SERVER_URL || 'https://js-anode-survival-server-multi.onrender.com' }}
         run: |
           npm i --no-save three@0.128.0 javascript-obfuscator@4
           mkdir -p ws/js && cp -r index.html css assets 1 ws/ && cp js/*.js ws/js/ && cp node_modules/three/build/three.min.js ws/
+          sed -i "s/__APP_VER__/$APP_VERSION/g" ws/js/game.js
+          grep -c "$APP_VERSION" ws/js/game.js
           for f in ws/js/*.js; do
             [ "$f" = "ws/js/register-sw.js" ] && continue
             npx javascript-obfuscator "$f" --output "$f" --compact true --string-array true --string-array-encoding base64 --string-array-threshold 0.75 --identifier-names-generator hexadecimal
