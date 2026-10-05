@@ -28,6 +28,19 @@ def opt(n, d):
 PORT = int(argv[0]) if argv and argv[0].isdigit() else int(os.environ.get('PORT') or CFG.get('port', 8000))   # Render/Heroku кладут порт в PORT
 NAME = str(opt('--name', CFG.get('name', 'ANODE')))[:32]
 MAXP = max(1, int(opt('--max', CFG.get('max', 16))))
+def load_srvcfg():          # serverconfig.txt в корне: version=..., wipe=..., wipe_id=...
+    c = {}
+    try:
+        with open(os.path.join(HERE, 'serverconfig.txt'), encoding='utf-8') as f:
+            for ln in f:
+                ln = ln.strip()
+                if ln and not ln.startswith('#') and '=' in ln: k, _, v = ln.partition('='); c[k.strip().lower()] = v.strip()
+    except OSError: pass
+    return c
+SRVCFG = load_srvcfg(); SRV_VER = os.environ.get('SERVER_VERSION') or SRVCFG.get('version', '')
+def ver_bad(v):             # True, если версия клиента не совпадает с версией сервера
+    return bool(SRV_VER) and str(v or '').strip() not in (SRV_VER, '__APP_VER__')   # '__APP_VER__' = веб-версия, которую раздаёт сам сервер (не штампована)
+def ver_msg(v): return f'Версия клиента ({str(v or "неизвестна")[:20]}) не совпадает с версией сервера ({SRV_VER}). Обновите игру.'
 
 def is_root(d): return os.path.isfile(os.path.join(d, 'index.html')) and os.path.isfile(os.path.join(d, 'js', 'game.js'))
 def find_root():
@@ -196,6 +209,7 @@ def banned(u, ip):
     return r[0][0] if r else None
 def api_auth(kind, d, ip):
     u, p = str(d.get('u', '')).strip(), str(d.get('p', ''))
+    if ver_bad(d.get('v')): return 426, {'error': ver_msg(d.get('v')), 'need': SRV_VER}
     b = banned(u, ip)
     if b is not None: return 403, {'error': 'Вы заблокированы' + (': ' + b if b else '')}
     if kind == 'register':
@@ -604,6 +618,7 @@ def read_frame(rf, cl):
 def handle_msg(cl, m):
     t = m.get('t')
     if t == 'join':
+        if ver_bad(m.get('v')): cl.send({'t': 'kick', 'm': ver_msg(m.get('v'))}); cl.alive = False; return
         u = session_user(m.get('k'))
         if not u: cl.send({'t': 'auth'}); cl.alive = False; return
         if banned(u, cl.ip) is not None: cl.send({'t': 'kick', 'm': 'Вы заблокированы на этом сервере'}); cl.alive = False; return
@@ -980,7 +995,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if p == '/ws' and 'websocket' in self.headers.get('Upgrade', '').lower(): return ws_session(self)
         if p == '/api/info':
             with LOCK: n = len(clients)
-            b = json.dumps({'name': NAME, 'port': PORT, 'cur': n, 'max': MAXP, 'ver': VER, 'reg': not NOREG, 'db': 'postgres' if PG else 'sqlite'}, ensure_ascii=False).encode()
+            b = json.dumps({'name': NAME, 'port': PORT, 'cur': n, 'max': MAXP, 'ver': VER, 'appver': SRV_VER, 'reg': not NOREG, 'db': 'postgres' if PG else 'sqlite'}, ensure_ascii=False).encode()
             self.send_response(200); self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b); return
         if p == '/api/top':
@@ -998,6 +1013,44 @@ class Server(socketserver.ThreadingTCPServer):
 
 try: srv = Server(('0.0.0.0', PORT), functools.partial(Handler, directory=ROOT))
 except OSError: sys.exit(f'Порт {PORT} занят (старый сервер ещё работает).\nВыполни:  pkill -f server.py   и запусти снова.')
+
+# ---------------- очистка мира / базы ----------------
+WIPE_KINDS = ('builds', 'resources', 'bags', 'world', 'players', 'all', 'everything')
+def wipe_data(kinds):
+    ks = set(kinds)
+    if 'everything' in ks: ks |= {'all'}
+    if 'all' in ks: ks |= {'world', 'players'}
+    if 'world' in ks: ks |= {'builds', 'resources', 'bags'}
+    with LOCK: cs = list(clients.values())
+    for c in cs:
+        try: c.send({'t': 'kick', 'm': 'Сервер очищен администратором, зайдите заново'}); c.alive = False; c.kick()
+        except Exception: pass
+    if cs: time.sleep(1.5)      # даём клиентам отключиться и сохранить профили до очистки
+    with LOCK:
+        if 'builds' in ks:
+            world['builds'].clear(); parts.clear(); prow.clear(); phpd.clear(); locks.clear(); dauth.clear(); stor.clear()
+            with COPL: cops.clear(); _copsave.clear()
+        if 'resources' in ks: world['dead'].clear(); world['hp'].clear(); node_types.clear()
+        if 'bags' in ks: bags.clear()
+    tabs = []
+    if 'builds' in ks: tabs += ['builds', 'bhp', 'locks', 'dauth', 'storage', 'copters']
+    if 'resources' in ks: tabs += ['dead', 'res_hp']
+    if 'bags' in ks: tabs += ['bags']
+    if 'players' in ks: tabs += ['players', 'xp']
+    if 'everything' in ks: tabs += ['accounts', 'sessions', 'chatlog', 'wallet', 'donations']
+    for t_ in tabs:
+        try: q(f'DELETE FROM {t_}')
+        except Exception as e: print(f'!!! очистка {t_}:', e)
+    print('* очищено:', ', '.join(tabs) or 'ничего')
+    return tabs
+def wipe_on_start():
+    kinds = [k.strip().lower() for k in SRVCFG.get('wipe', '').split(',') if k.strip() in WIPE_KINDS]
+    wid = SRVCFG.get('wipe_id', '0')
+    if not kinds: return
+    r = qa("SELECT v FROM meta WHERE k='wipe_id'")
+    if r and r[0][0] == wid: return
+    print('* serverconfig.txt: очистка', kinds, '(wipe_id=%s)' % wid); wipe_data(kinds)
+    q('DELETE FROM meta WHERE k=?', ('wipe_id',)); q('INSERT INTO meta VALUES(?,?)', ('wipe_id', wid))
 
 LAN = lan_ips()
 BK = os.path.join(DATA, 'backups')
@@ -1022,7 +1075,7 @@ def console():
     for line in sys.stdin:
         cmd, _, arg = line.strip().partition(' '); arg = arg.strip(); args = arg.split()
         try:
-            if cmd in ('help', '?'): print('status | players | accounts | kick <ник> | ban <ник> [причина] | banip <ip> | unban <ник|ip> | bans | passwd <ник> <новый пароль> | delacc <ник> | say <текст> | backup | stop')
+            if cmd in ('help', '?'): print('status | players | accounts | kick <ник> | ban <ник> [причина] | banip <ip> | unban <ник|ip> | bans | passwd <ник> <новый пароль> | delacc <ник> | say <текст> | backup | wipe <builds|resources|bags|world|players|all|everything> yes | reload | stop')
             elif cmd == 'status':
                 print(f'«{NAME}»: {len(clients)}/{MAXP} онлайн, аккаунтов: {qa("SELECT COUNT(*) FROM accounts")[0][0]}, построек: {len(world["builds"])}, аптайм: {int(time.time() - T0)} c')
             elif cmd == 'players':
@@ -1060,6 +1113,12 @@ def console():
                 if c: c.kick()
                 print('Аккаунт удалён:', a[0])
             elif cmd == 'say' and arg: broadcast({'t': 'c', 'n': '', 'm': '[Сервер] ' + arg})
+            elif cmd == 'wipe':
+                ks = [a_.lower() for a_ in args if a_.lower() in WIPE_KINDS]
+                if not ks or args[-1].lower() != 'yes': print('Пример: wipe world yes   (builds, resources, bags, world, players, all, everything). Сделай backup перед очисткой!')
+                else: wipe_data(ks)
+            elif cmd == 'reload':
+                SRVCFG.update(load_srvcfg()); globals()['SRV_VER'] = os.environ.get('SERVER_VERSION') or SRVCFG.get('version', ''); print('Версия сервера:', SRV_VER or '(проверка выключена)')
             elif cmd == 'backup': print('Копия базы:', backup_db())
             elif cmd == 'stop': os.kill(os.getpid(), 2)
             elif cmd: print('Неизвестная команда. help — список')
@@ -1068,7 +1127,8 @@ T0 = time.time()
 for _f in (ticker, auto_backup, console, bag_sweeper, decayer, quarry_loop): threading.Thread(target=_f, daemon=True).start()
 try: backup_db()
 except Exception as _e: print('Бэкап не создан:', _e)
-print(f'=== «{NAME}» — макс. игроков: {MAXP} ===')
+wipe_on_start()
+print(f'=== «{NAME}» — макс. игроков: {MAXP}, версия: {SRV_VER or "любая"} ===')
 print(f'База: {"PostgreSQL" if PG else DBF}  (построек: {len(world["builds"])}, уничтожено ресурсов: {len(world["dead"])})')
 for ip in LAN: print(f'>>> АДРЕС ДЛЯ ВСЕХ (и для тебя тоже): http://{ip}:{PORT}/')
 if LAN[0] == '127.0.0.1': print('!!! Нет сети Wi-Fi/хотспота — включи раздачу или подключись к Wi-Fi')
