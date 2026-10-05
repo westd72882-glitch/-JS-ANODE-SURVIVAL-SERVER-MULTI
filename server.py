@@ -38,9 +38,14 @@ def load_srvcfg():          # serverconfig.txt в корне: version=..., wipe=
     except OSError: pass
     return c
 SRVCFG = load_srvcfg(); SRV_VER = os.environ.get('SERVER_VERSION') or SRVCFG.get('version', '')
-def ver_bad(v):             # True, если версия клиента не совпадает с версией сервера
-    return bool(SRV_VER) and str(v or '').strip() not in (SRV_VER, '__APP_VER__')   # '__APP_VER__' = веб-версия, которую раздаёт сам сервер (не штампована)
-def ver_msg(v): return f'Версия клиента ({str(v or "неизвестна")[:20]}) не совпадает с версией сервера ({SRV_VER}). Обновите игру.'
+SRV_SECRET = os.environ.get('SERVER_SECRET') or SRVCFG.get('secret', '')
+def ver_ok_sig(v, sig):     # подпись = sha256(версия:секрет); клиент получает её при сборке APK внутри зашифрованного a.dat
+    if not SRV_SECRET: return True
+    want = hashlib.sha256(f'{SRV_VER}:{SRV_SECRET}'.encode()).hexdigest()
+    return hmac.compare_digest(want, str(sig or ''))
+def ver_bad(v, sig=None):   # True, если версия приложения не совпадает с версией сервера или подпись неверна
+    return bool(SRV_VER) and (str(v or '').strip() != SRV_VER or not ver_ok_sig(v, sig))
+def ver_msg(v=None): return f'Версия клиента не совпадает с версией сервера ({SRV_VER}). Обновите игру.'
 
 def is_root(d): return os.path.isfile(os.path.join(d, 'index.html')) and os.path.isfile(os.path.join(d, 'js', 'game.js'))
 def find_root():
@@ -209,7 +214,7 @@ def banned(u, ip):
     return r[0][0] if r else None
 def api_auth(kind, d, ip):
     u, p = str(d.get('u', '')).strip(), str(d.get('p', ''))
-    if ver_bad(d.get('v')): return 426, {'error': ver_msg(d.get('v')), 'need': SRV_VER}
+    if ver_bad(d.get('v'), d.get('s')): return 426, {'error': ver_msg(), 'need': SRV_VER}
     b = banned(u, ip)
     if b is not None: return 403, {'error': 'Вы заблокированы' + (': ' + b if b else '')}
     if kind == 'register':
@@ -618,7 +623,7 @@ def read_frame(rf, cl):
 def handle_msg(cl, m):
     t = m.get('t')
     if t == 'join':
-        if ver_bad(m.get('v')): cl.send({'t': 'kick', 'm': ver_msg(m.get('v'))}); cl.alive = False; return
+        if ver_bad(m.get('v'), m.get('s')): cl.send({'t': 'kick', 'm': ver_msg()}); cl.alive = False; return
         u = session_user(m.get('k'))
         if not u: cl.send({'t': 'auth'}); cl.alive = False; return
         if banned(u, cl.ip) is not None: cl.send({'t': 'kick', 'm': 'Вы заблокированы на этом сервере'}); cl.alive = False; return
@@ -1118,7 +1123,7 @@ def console():
                 if not ks or args[-1].lower() != 'yes': print('Пример: wipe world yes   (builds, resources, bags, world, players, all, everything). Сделай backup перед очисткой!')
                 else: wipe_data(ks)
             elif cmd == 'reload':
-                SRVCFG.update(load_srvcfg()); globals()['SRV_VER'] = os.environ.get('SERVER_VERSION') or SRVCFG.get('version', ''); print('Версия сервера:', SRV_VER or '(проверка выключена)')
+                SRVCFG.update(load_srvcfg()); globals()['SRV_VER'] = os.environ.get('SERVER_VERSION') or SRVCFG.get('version', ''); globals()['SRV_SECRET'] = os.environ.get('SERVER_SECRET') or SRVCFG.get('secret', ''); print('Версия сервера:', SRV_VER or '(проверка выключена)')
             elif cmd == 'backup': print('Копия базы:', backup_db())
             elif cmd == 'stop': os.kill(os.getpid(), 2)
             elif cmd: print('Неизвестная команда. help — список')
