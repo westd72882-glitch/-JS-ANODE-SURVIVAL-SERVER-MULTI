@@ -14,5 +14,5 @@ fs.mkdirSync(out,{recursive:true}); fs.writeFileSync(path.join(out,'a.dat'),Buff
 const tpl=fs.readFileSync(path.join(__dirname,'loader.tpl.js'),'utf8').replace('%%CIPHER%%',()=>fs.readFileSync(path.join(__dirname,'cipher.js'),'utf8').replace(/if\(typeof module[^\n]*\n?/,'')).replace('%%KEY%%',KEY).replace('%%SERVER%%',SERVER);
 fs.writeFileSync(path.join(out,'b.js'),tpl);
 const vp=(fs.readFileSync(path.join(src,'index.html'),'utf8').match(/<meta name="viewport"[^>]*>/)||[''])[0];
-fs.writeFileSync(path.join(out,'index.html'),`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">${vp}<title>ANODE SURVIVAL</title><style>html,body{margin:0;background:#120d0b}</style></head><body><script src="b.js"></script></body></html>`);
+fs.writeFileSync(path.join(out,'index.html'),`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">${vp}<title>ANODE SURVIVAL</title><style>html,body{margin:0;background:#0a1224}</style></head><body><script src="b.js"></script></body></html>`);
 console.log('упаковано файлов:',list.length,'размер a.dat:',off);
