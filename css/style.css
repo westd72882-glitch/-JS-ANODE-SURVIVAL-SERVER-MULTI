@@ -950,3 +950,63 @@ input::selection,textarea::selection{ background:rgba(255,255,255,.25); }
 #start-screen #m-gearBtn{ transform:translate(-15%,1px); }
 #start-screen #m-gearBtn{ transform:translate(-15%,-1px); }
 #start-screen #m-gearBtn{ transform:translate(-10%,-1px); }
+
+/* ===== Тёмно-синий фон экранов загрузки и входа (до фона меню) ===== */
+:root{ --nv0:#050a15; --nv1:#0a1224; --nv2:#12213f; --nv-line:rgba(233,238,248,.22); --nv-dim:rgba(233,238,248,.45); --nv-ink:#f6ece4; }
+#loading-screen{ background:var(--nv1); }
+#loading-screen .ld-bg{ background:radial-gradient(120% 90% at 50% 0%,var(--nv2) 0%,var(--nv1) 48%,var(--nv0) 100%); filter:none; transform:none; }
+
+/* ===== Окно входа: без карточки, слито с фоном ===== */
+#auth-ov{ position:fixed; inset:0; z-index:150; display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+  background:radial-gradient(120% 90% at 50% 0%,var(--nv2) 0%,var(--nv1) 48%,var(--nv0) 100%);
+  color:#e9eef8; font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif; transition:opacity .45s ease; }
+#auth-ov.out{ opacity:0; pointer-events:none; }
+#auth-ov .au-wrap{ display:flex; align-items:center; gap:clamp(36px,9vw,130px); animation:auin .7s ease both; }
+@keyframes auin{ from{ opacity:0; } to{ opacity:1; } }
+#auth-ov .au-brand{ display:flex; align-items:center; gap:14px; }
+#auth-ov .au-brand img{ width:clamp(48px,12vh,84px); height:clamp(48px,12vh,84px); box-shadow:0 4px 18px rgba(0,0,0,.55); }
+#auth-ov .t1{ font-size:clamp(34px,9.5vh,60px); font-weight:900; color:var(--nv-ink); letter-spacing:2px; line-height:.95; }
+#auth-ov .t2{ background:var(--nv-ink); color:#0a1224; font-weight:900; font-size:clamp(11px,2.6vh,18px); letter-spacing:1px; padding:2px 8px; display:inline-block; margin-top:2px; }
+#auth-ov .au-form{ width:min(300px,42vw); display:flex; flex-direction:column; }
+#auth-ov .au-in{ width:100%; box-sizing:border-box; background:transparent; border:0; border-bottom:1px solid var(--nv-line); border-radius:0; outline:none;
+  padding:clamp(8px,2vh,13px) 2px clamp(6px,1.6vh,10px); margin:0 0 clamp(4px,1vh,8px); color:var(--nv-ink); font:600 17px "Roboto Condensed","Arial Narrow",Arial,sans-serif; letter-spacing:.6px; transition:border-color .2s; }
+#auth-ov .au-in::placeholder{ color:var(--nv-dim); font-weight:500; }
+#auth-ov .au-in:focus{ border-bottom-color:var(--nv-ink); }
+#auth-ov .au-in:-webkit-autofill{ -webkit-box-shadow:0 0 0 40px var(--nv1) inset; -webkit-text-fill-color:var(--nv-ink); caret-color:var(--nv-ink); }
+#auth-ov .au-err{ min-height:clamp(14px,2.6vh,20px); margin:2px 0 clamp(4px,1.2vh,10px); font-size:13px; line-height:1.25; color:var(--nv-dim); }
+#auth-ov .au-err.bad{ color:#ff9b8f; }
+#auth-ov .au-main{ height:clamp(38px,7.5vh,46px); border:0; border-radius:0; background:var(--nv-ink); color:#0a1224; font:900 15px "Roboto Condensed","Arial Narrow",Arial,sans-serif; letter-spacing:3px; cursor:pointer; transition:transform .12s, opacity .2s; }
+#auth-ov .au-main:active{ transform:scale(.98); }
+#auth-ov.busy .au-main{ opacity:.55; pointer-events:none; }
+#auth-ov .au-links{ display:flex; justify-content:space-between; gap:12px; margin-top:clamp(4px,1.2vh,10px); }
+#auth-ov .au-links button{ background:none; border:0; padding:8px 0; color:var(--nv-dim); font:600 13px "Roboto Condensed","Arial Narrow",Arial,sans-serif; letter-spacing:.8px; cursor:pointer; transition:color .15s; }
+#auth-ov .au-links button:hover,#auth-ov .au-links button:active{ color:var(--nv-ink); }
+#auth-ov .au-ok{ display:flex; align-items:flex-start; gap:9px; margin-top:clamp(2px,1vh,8px); font-size:11px; line-height:1.3; color:var(--nv-dim); cursor:pointer; }
+#auth-ov .au-ok input{ position:absolute; opacity:0; pointer-events:none; }
+#auth-ov .au-ok i{ flex:none; width:13px; height:13px; margin-top:1px; border:1px solid var(--nv-line); transition:background .15s,border-color .15s; }
+#auth-ov .au-ok input:checked + i{ background:var(--nv-ink); border-color:var(--nv-ink); box-shadow:inset 0 0 0 2px var(--nv1); }
+#auth-ov .au-stat{ position:absolute; left:0; right:0; bottom:calc(16px + env(safe-area-inset-bottom,0px)); display:none; align-items:center; justify-content:center; gap:10px; font-size:11px; font-weight:700; letter-spacing:3px; color:var(--nv-dim); }
+#auth-ov .au-stat.on{ display:flex; }
+#auth-ov .au-stat b{ width:12px; height:12px; border:2px solid rgba(255,255,255,.16); border-top-color:var(--nv-ink); border-radius:50%; animation:ldspin .9s linear infinite; }
+#auth-ov .au-ver{ position:absolute; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(14px + env(safe-area-inset-bottom,0px)); font-size:11px; letter-spacing:1px; color:var(--nv-dim); }
+@media (max-aspect-ratio:1/1){ #auth-ov .au-wrap{ flex-direction:column; gap:34px; } #auth-ov .au-form{ width:min(320px,80vw); } }
+@media (prefers-reduced-motion:reduce){ #auth-ov .au-wrap{ animation:none; } #auth-ov .au-stat b{ animation-duration:2.4s; } }
+
+/* версия в меню */
+#start-screen .m-ver{ position:absolute; left:calc(14px + env(safe-area-inset-left,0px)); bottom:calc(10px + env(safe-area-inset-bottom,0px)); margin:0; z-index:5; font-size:11px; letter-spacing:1px; color:rgba(255,255,255,.4); pointer-events:none; }
+
+/* ===== окно входа: устойчивая раскладка (клавиатура, смена раскладки) и режим регистрации ===== */
+#auth-ov{ --avh:100dvh; height:var(--avh); bottom:auto; overflow-y:auto; overflow-x:hidden; align-items:flex-start; overscroll-behavior:contain; }
+#auth-ov .au-wrap{ margin:auto; padding:18px 24px; box-sizing:border-box; }
+#auth-ov .au-more{ display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows .28s ease, opacity .28s ease; }
+#auth-ov .au-more>div{ overflow:hidden; min-height:0; }
+#auth-ov.reg .au-more{ grid-template-rows:1fr; opacity:1; }
+#auth-ov.kb .au-brand{ display:none; }
+#auth-ov.kb .au-ok{ display:none; }
+#auth-ov.kb .au-wrap{ padding-top:8px; padding-bottom:8px; }
+#auth-ov.kb .au-in{ padding-top:7px; padding-bottom:5px; margin-bottom:3px; }
+#auth-ov.kb .au-main{ height:36px; }
+#auth-ov.kb .au-links button{ padding:5px 0; }
+#auth-ov.kb .au-stat,#auth-ov.kb .au-ver{ display:none; }
+@media (prefers-reduced-motion:reduce){ #auth-ov .au-more{ transition:none; } }
