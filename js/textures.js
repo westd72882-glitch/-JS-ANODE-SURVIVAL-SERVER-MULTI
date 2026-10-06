@@ -57,3 +57,7 @@ TEXTURES.icon_cupboard = "1/locker.webp";
 TEXTURES.icon_startrock = "1/start_rock.webp";
 TEXTURES.tex_rustdoor = "1/door_metal.webp";
 TEXTURES.icon_box      = "assets/images/Crate.webp";
+
+TEXTURES.tex_iron = "assets/images/Iron_Plate.webp";           // листовое железо
+TEXTURES.tex_adoor = "assets/images/Armored_Door_Tex.webp";     // бронедверь
+TEXTURES.icon_adoor = "assets/images/Armored_Door_Icon.webp";   // иконка бронедвери

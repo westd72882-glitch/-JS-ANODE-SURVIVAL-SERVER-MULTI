@@ -85,6 +85,8 @@ function generate(seed,N,size){
     if(pd<30){ const t=pd<=18?1:1-sm(18,30,pd); e=e*(1-t)+padH*t; }
     const qi=(0.5+78/size)*(N-1), qj=(0.5-74/size)*(N-1), qd=Math.hypot(i-qi,j-qj)*cellM;   // Агропром (снежный угол)
     if(qd<40){ const t=qd<=27?1:1-sm(27,40,qd); e=e*(1-t)+3.5*t; if(qd<=33&&e>0.3) biome[k]=B.SNOW; }
+    const di=(0.5+68/size)*(N-1), dj=(0.5+88/size)*(N-1), dd=Math.hypot(i-di,j-dj)*cellM;   // Пустынный город: ровная площадка 2.4 м
+    if(dd<36){ const t2=dd<=24?1:1-sm(24,36,dd); e=e*(1-t2)+2.4*t2; }
     h[k]=e;
   }
   return {N,seed,size,h,biome,lake};

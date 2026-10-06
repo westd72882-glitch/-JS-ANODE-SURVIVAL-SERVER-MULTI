@@ -6,7 +6,7 @@ window.OSIL_SETTINGS=(function(){
     sens:10, invertY:false, joySize:100, btnSize:100,
     res:100, lighting:1, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:3, dist:200, fov:75, bob:100, water:true,
     volMaster:10, volSfx:10, volMusic:10, volSteps:10,
-    hudOn:true, fps:true, fpsCap:1, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0, ultra:false
+    hudOn:true, fps:true, fpsCap:4, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0, ultra:false
   };
   const all=Object.assign({},DEF);
   try{ if(!localStorage.getItem('osil_res_fix')){ localStorage.setItem('osil_res_fix','1'); } }catch(e){}
@@ -14,13 +14,14 @@ window.OSIL_SETTINGS=(function(){
   try{ if(all.dist>200){ all.dist=200; localStorage.setItem(KEY,JSON.stringify(all)); } }catch(e){}
   try{ if(!localStorage.getItem('osil_sens10')){ all.sens=10; localStorage.setItem('osil_sens10','1'); localStorage.setItem(KEY,JSON.stringify(all)); } }catch(e){}
   try{ if(!localStorage.getItem('osil_defaults_v3')){ Object.assign(all,{res:100,lighting:1,shadowFilter:1,texQ:4,aniso:4,waterQ:1,shadows:3,dist:200,shadowDist:120,fov:75,miniSize:70}); localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_defaults_v3','1'); } }catch(e){}
+  try{ if(!localStorage.getItem('osil_defaults_v4')){ Object.assign(all,{res:100,fpsCap:4,ultra:false}); localStorage.removeItem('osil_ultra_bak'); localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_defaults_v4','1'); } }catch(e){}
   const subs=[];
   try{ if(!localStorage.getItem('osil_mini_off')){ all.minimap=false; localStorage.setItem(KEY,JSON.stringify(all)); localStorage.setItem('osil_mini_off','1'); } }catch(e){}
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(all)); }catch(e){} }
   function emit(k){ subs.forEach(f=>{ try{ f(k,all[k],all); }catch(e){ console.error(e); } }); }
   function set(k,v){ all[k]=v; save(); emit(k); }
   function onChange(f){ subs.push(f); }
-  const ULTRA={res:55,shadows:0,shadowDist:30,dist:90,lighting:0,shadowFilter:0,texQ:1,aniso:0,waterQ:0,water:false,particles:false,bob:50,fpsCap:1};
+  const ULTRA={res:55,shadows:0,shadowDist:30,dist:90,lighting:0,shadowFilter:0,texQ:1,aniso:0,waterQ:0,water:false,particles:false,bob:50,fpsCap:4};
   function ultraApply(v){
     if(v){ try{ if(!localStorage.getItem('osil_ultra_bak')){ const b={}; Object.keys(ULTRA).forEach(k=>b[k]=all[k]); localStorage.setItem('osil_ultra_bak',JSON.stringify(b)); } }catch(e){}
       Object.keys(ULTRA).forEach(k=>{ all[k]=ULTRA[k]; }); all.ultra=true; save(); emit(null); }
@@ -43,7 +44,10 @@ window.OSIL_SETTINGS=(function(){
     ]},
     {id:'gfx',name:'Графика',rows:[
       {k:'ultra',t:'toggle',n:'УЛЬТРА-ОПТИМИЗАЦИЯ · 60 FPS',d:'Максимальная скорость на любом устройстве: минимальные тени, вода и частицы, меньше дальность, а разрешение само подстраивается под 60 FPS. Выключите — прежние настройки вернутся'},
-      {t:'head',n:'Качество'},
+      {t:'head',n:'Главное'},
+      {k:'res',t:'range',n:'Разрешение картинки',d:'Ниже — быстрее на слабых телефонах',min:50,max:100,step:5,u:'%'},
+      {k:'fpsCap',t:'seg',n:'Лимит FPS',d:'Ставьте равным частоте экрана (90 Гц → 90, 120 Гц → 120) или «Без лимита» — так картинка идёт ровнее. 60 на экране 90 Гц даёт рывки',opts:['30','60','90','120','Без лимита']},
+      {t:'preset',n:'Пресет графики',d:'Одним касанием выставляет разрешение, тени и дальность'},
       {t:'head',n:'Освещение и тени'},
       {k:'lighting',t:'seg',n:'Освещение',d:'Статическое — тени обновляются по событию (быстрее). Динамическое — тени пересчитываются каждый кадр (плавнее, дороже)',opts:['Статическое','Динамическое']},
       {k:'shadowFilter',t:'seg',n:'Края теней',d:'Жёсткие — быстрее. Мягкие — красивее',opts:['Жёсткие','Мягкие']},
@@ -51,12 +55,9 @@ window.OSIL_SETTINGS=(function(){
       {k:'texQ',t:'seg',n:'Качество текстур',d:'Размер текстур. Меньше — меньше памяти и быстрее на слабых телефонах',opts:['Ультра слабое','Низкое','Среднее','Высокое','Ультра']},
       {k:'aniso',t:'seg',n:'Анизотропная фильтрация',d:'Чёткость текстур под острым углом (земля вдали). Выше — резче, чуть дороже',opts:['Выкл','2×','4×','8×','16×']},
       {k:'waterQ',t:'seg',n:'Качество воды',d:'Низкое — простая вода. Высокое — глубина, пена, блики',opts:['Низкое','Высокое']},
-      {t:'preset',n:'Пресет графики',d:'Одним касанием выставляет разрешение, тени и дальность'},
       {t:'head',n:'Детали'},
-      {k:'res',t:'range',n:'Разрешение картинки',d:'Ниже — быстрее на слабых телефонах',min:50,max:100,step:5,u:'%'},
       {k:'shadows',t:'seg',n:'Тени',opts:['Выкл','Низкие','Средние','Высокие']},
       {k:'shadowDist',t:'range',n:'Дальность теней',min:30,max:120,step:10,u:' м'},
-      {k:'fpsCap',t:'seg',n:'Лимит FPS',opts:['30','60','90','Без лимита']},
       {k:'dist',t:'range',n:'Дальность прорисовки',min:60,max:200,step:10,u:' м'},
       {k:'fov',t:'range',n:'Поле зрения (FOV)',min:60,max:100,step:1,u:'°'},
       {k:'bob',t:'range',n:'Покачивание при ходьбе',d:'Качание рук и кирки при движении',min:0,max:100,step:10,u:'%'},

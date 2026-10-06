@@ -7,8 +7,11 @@ let layoutEditing = false, FPS_CAP_MS = 0, ultraDyn = 0, ultraLo = 0, ultraHi = 
 
 /* ---------------- Texture loader helpers ---------------- */
 const texLoader = new THREE.TextureLoader();
+/* заглушка: если картинка/иконка не найдена — белый квадрат, а не битый значок */
+const WHITE_PX = 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#fff"/></svg>');
+document.addEventListener('error', e=>{ const t=e.target; if(t && t.tagName==='IMG' && t.src!==WHITE_PX && !t.dataset.fb){ t.dataset.fb='1'; t.src=WHITE_PX; } }, true);
 function loadTex(dataUrl, repeatX, repeatY){
-  const t = texLoader.load(dataUrl);
+  const t = texLoader.load(dataUrl, undefined, undefined, ()=>{ const c=document.createElement('canvas'); c.width=c.height=8; const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,8,8); t.image=c; t.needsUpdate=true; });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if(repeatX) t.repeat.set(repeatX, repeatY||repeatX);
   return t;
@@ -1776,9 +1779,36 @@ function hudSafety(){ if(document.body.classList.contains('ui-open') !== !!panel
 const SMELT_T = 2.5, FUEL_BURN = {wood:12, fuel:40}, FUR_IN = {metal_ore:'metal', sulfur_ore:'sulfur'};
 const furnState = new Map();     // id → {ore:{metal_ore,sulfur_ore}, fuel:{wood,fuel}, out:{metal,sulfur}, burn, t}
 function furSt(id){ let f = furnState.get(id); if(!f){ f = {ore:{metal_ore:0,sulfur_ore:0}, fuel:{wood:0,fuel:0}, out:{metal:0,sulfur:0}, burn:0, t:0}; furnState.set(id, f); } return f; }
+/* текстуры/материалы печки: железо и анимированное пламя */
+let _ironM=null, _flameM=null;
+function _ironMat(){ return _ironM || (_ironM = new THREE.MeshStandardMaterial({map:loadTex(TEXTURES.tex_iron,1,1), color:0xc8ccd2, roughness:0.5, metalness:0.55})); }
+function _flameMat(){
+  if(_flameM) return _flameM;
+  const c=document.createElement('canvas'); c.width=64; c.height=96; const x=c.getContext('2d');
+  const lay=[[0.46,'rgba(255,60,0,0)','rgba(255,90,10,.85)',44,1],[0.34,'rgba(255,170,30,0)','rgba(255,170,40,.95)',34,1],[0.2,'rgba(255,255,200,0)','rgba(255,250,200,1)',22,1]];
+  lay.forEach(l=>{ const hw=l[3]*0.55, h=l[3]*2.1; x.beginPath(); x.moveTo(32,94); x.bezierCurveTo(32-hw*1.4,80,32-hw,50,32,94-h); x.bezierCurveTo(32+hw,50,32+hw*1.4,80,32,94); x.closePath();
+    const g=x.createLinearGradient(0,94,0,94-h); g.addColorStop(0,l[2]); g.addColorStop(1,l[1]); x.fillStyle=g; x.fill(); });
+  const t=new THREE.CanvasTexture(c);
+  return _flameM = new THREE.MeshBasicMaterial({map:t, transparent:true, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending});
+}
+function furnaceFire(id, on){
+  const pp = parts.get(id); const fl = pp && pp.obj && pp.obj.userData && pp.obj.userData.fire; if(!fl) return;
+  const g = fl[0]; g.visible = on; if(!on) return;
+  const t = performance.now()*0.001 + id*1.7;
+  const k = 0.9 + Math.sin(t*13)*0.12 + Math.sin(t*23.7)*0.08;
+  g.scale.set(1+Math.sin(t*9)*0.1, k*(1+Math.sin(t*17)*0.12), 1+Math.cos(t*11)*0.1);
+  g.rotation.y = Math.sin(t*3.1)*0.5; g.position.x = Math.sin(t*7)*0.02;
+}
+const furnLight = new THREE.PointLight(0xff8a30, 0, 5, 2); furnLight.position.set(0,-50,0); scene.add(furnLight);   // один постоянный свет: шейдеры не перекомпилируются
 function furnaceTick(dt){
-  if(!furnState.size) return;
+  if(!furnState.size){ furnLight.intensity = 0; if(window.OSIL_AUDIO&&OSIL_AUDIO.furnace) OSIL_AUDIO.furnace(0); return; }
+  { let best=1e9, bp=null; furnState.forEach((f,id)=>{ if(f.burn>0){ const pp=parts.get(id); if(pp&&pp.obj){ const d=Math.hypot(pp.obj.position.x-player.pos.x,pp.obj.position.z-player.pos.z); if(d<best){ best=d; bp=pp.obj; } } } });
+    if(bp && best<30){ furnLight.position.set(bp.position.x+Math.sin(bp.rotation.y)*0.35, bp.position.y+0.8, bp.position.z+Math.cos(bp.rotation.y)*0.35); furnLight.intensity = 1.6+Math.sin(performance.now()*0.02)*0.4; } else furnLight.intensity = 0;
+  }
+  { let best=1e9; furnState.forEach((f,id)=>{ if(f.burn>0){ const pp=parts.get(id); if(pp&&pp.obj){ const d=Math.hypot(pp.obj.position.x-player.pos.x,pp.obj.position.z-player.pos.z); if(d<best) best=d; } } });
+    if(window.OSIL_AUDIO&&OSIL_AUDIO.furnace) OSIL_AUDIO.furnace(best<18?Math.pow(1-best/18,1.5):0); }
   furnState.forEach((f, id)=>{
+    furnaceFire(id, f.burn > 0);
     const has = f.ore.metal_ore + f.ore.sulfur_ore > 0;
     if(!has){ f.t = 0; if(f.burn > 0) f.burn = Math.max(0, f.burn - dt); return; }
     if(f.burn <= 0){
@@ -1787,7 +1817,9 @@ function furnaceTick(dt){
       f.fuel[fk]--; f.burn = FUEL_BURN[fk];
     }
     f.burn -= dt; f.t += dt;
-    if(CFG.particles){ f._sm = (f._sm||0) - dt; if(f._sm <= 0){ f._sm = 0.3; const pp = parts.get(id);
+    if(CFG.particles){ f._em = (f._em||0) - dt; if(f._em <= 0){ f._em = 0.18; const pp = parts.get(id);
+      if(pp && pp.obj && Math.hypot(pp.obj.position.x-player.pos.x, pp.obj.position.z-player.pos.z) < 25){ const o=pp.obj.position, ry=pp.obj.rotation.y; fxEmit('spark', new THREE.Vector3(o.x+Math.sin(ry)*0.66+(Math.random()-0.5)*0.2, o.y+0.55, o.z+Math.cos(ry)*0.66), new THREE.Vector3((Math.random()-0.5)*0.4,0.9+Math.random()*0.7,(Math.random()-0.5)*0.4), 0.7, 0.09, 0.02, 0xffe27a, 0xff5a10, {a:0.95, rise:0.6}); } }
+      f._sm = (f._sm||0) - dt; if(f._sm <= 0){ f._sm = 0.3; const pp = parts.get(id);
       if(pp && pp.obj && Math.hypot(pp.obj.position.x-player.pos.x, pp.obj.position.z-player.pos.z) < 50) fxEmit('smoke', pp.obj.position.clone().add(new THREE.Vector3(0,1.7,0)), new THREE.Vector3(0.05,0.9,0.05), 1.8, 0.2, 1.1, 0x6f6a63, 0xb8b3ab, {drag:0.7, a:0.45}); } }
     while(f.t >= SMELT_T){
       const ok = f.ore.metal_ore > 0 ? 'metal_ore' : f.ore.sulfur_ore > 0 ? 'sulfur_ore' : null;
@@ -1969,7 +2001,10 @@ function fireGun(){
   shotImpact();
   if(window.OSIL_NET) OSIL_NET.onShoot();
   boarShot(G_.dmg); window.__shotT=performance.now(); botShot(G_.dmg);
-  hitBuildingRay(sl.k, 220);
+  if(!hitBuildingRay(sl.k, 220)){
+    const gp = groundRayHit(220, 0.6);
+    if(gp){ groundImpact(gp, false); OSIL_AUDIO.play('hit_stone',{rate:1.6,vol:0.3}); }
+  }
   wearTool(sl.k,1);
   updateAmmoHud();
 }
@@ -2275,6 +2310,7 @@ const ITEM_DEFS = {
   wood_wall:{name:'Деревянная стена',icon:TEXTURES.icon_wall, stack:10, kind:'comp'},
   hammer:  {name:'Киянка',        icon:TEXTURES.icon_hammer,  stack:1,  kind:'gear'},
   mdoor:   {name:'Железная дверь',icon:TEXTURES.icon_mdoor,stack:10,kind:'comp'},
+  adoor:   {name:'Бронированная дверь',icon:TEXTURES.icon_adoor,stack:10,kind:'comp'},
   door:    {name:'Дверь',         icon:TEXTURES.icon_door,    stack:10, kind:'comp'},
   cupboard:{name:'Шкаф',          icon:TEXTURES.icon_cupboard,stack:5,  kind:'comp'},
   copter:  {name:'Миникоптер',    icon:'1/copter.webp', stack:1, kind:'gear'},
@@ -2415,20 +2451,20 @@ function giveItem(k, n, dur){
   return got;
 }
 
-function makeBuildMat(){ return new THREE.MeshStandardMaterial({map:loadTex(TEXTURES.tex_plank,1,1), roughness:0.95}); }
+function makeBuildMat(tx){ return new THREE.MeshStandardMaterial({map:loadTex(TEXTURES[tx||'tex_plank'],1,1), roughness:0.95}); }
 
 /* фундамент как в Rust: верх на 0.3 м над землёй, остальные ~1.3 м уходят под землю (скрывают неровности склона) */
-function createFoundation(){ return new THREE.Mesh(new THREE.BoxGeometry(4,1.6,4), makeBuildMat()); }
+function createFoundation(){ const m=makeBuildMat('tex_wood'); m.color.set(0xb89466); return new THREE.Mesh(new THREE.BoxGeometry(4,1.6,4), m); }
 function createWall(){ return new THREE.Mesh(new THREE.BoxGeometry(4,3.5,0.25), makeBuildMat()); }
-function createFloor(){ return new THREE.Mesh(new THREE.BoxGeometry(4,0.15,4), makeBuildMat()); }
+function createFloor(){ return new THREE.Mesh(new THREE.BoxGeometry(4,0.15,4), makeBuildMat('tex_wood')); }
 function createDoorway(){
   const grp = new THREE.Group();
   const mat = makeBuildMat();
-  const top = new THREE.Mesh(new THREE.BoxGeometry(4,0.9,0.25), mat);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.9,0.25), mat);
   top.position.y = 1.3;
-  const left = new THREE.Mesh(new THREE.BoxGeometry(1.2,3.5,0.25), mat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(1.2,3.496,0.25), mat);
   left.position.x = -1.4;
-  const right = new THREE.Mesh(new THREE.BoxGeometry(1.2,3.5,0.25), mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(1.2,3.496,0.25), mat);
   right.position.x = 1.4;
   grp.add(top,left,right);
   return grp;
@@ -2438,7 +2474,7 @@ function createShootWall(){
   const g=new THREE.Group(), mat=makeBuildMat();
   const low=new THREE.Mesh(new THREE.BoxGeometry(4,1.1,0.25),mat); low.position.y=-1.2; g.add(low);
   const up=new THREE.Mesh(new THREE.BoxGeometry(4,1.2,0.25),mat); up.position.y=1.15; g.add(up);
-  [-1,1].forEach(s=>{ const p=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.2,0.25),mat); p.position.set(s*1.15,-0.05,0); g.add(p); });
+  [-1,1].forEach(s=>{ const p=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.196,0.25),mat); p.position.set(s*1.15,-0.05,0); g.add(p); });
   return g;
 }
 function createParapet(){      // низкая крыша-бруствер с зубцами: стрелять поверх и между зубцами
@@ -2458,10 +2494,11 @@ const CELL = 4;            // размер клетки, м
 const FLOOR_H = 3.5;         // высота этажа
 /* кодовая панель на двери: одна плоскость с canvas-текстурой, клавиши нажимаются прицелом + «Удар» */
 const PAD_W=256, PAD_H=384, PAD_KEYS=['1','2','3','4','5','6','7','8','9','✖','0','⌫'];
-function makePad(){
+function makePad(th){
   const cv=document.createElement('canvas'); cv.width=PAD_W; cv.height=PAD_H;
-  const tex=new THREE.CanvasTexture(cv), mat=new THREE.MeshBasicMaterial({map:tex});
-  const mk=back=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.51),mat); m.position.set(1.2,0,back?-0.056:0.056); if(back) m.rotation.y=Math.PI; return m; };
+  const off=(th||0.1)/2+0.02;      // панель кода — снаружи полотна, у любой толщины двери (деревянная, железная, бронированная)
+  const tex=new THREE.CanvasTexture(cv), mat=new THREE.MeshBasicMaterial({map:tex, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  const mk=back=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.51),mat); m.position.set(1.2,0,back?-off:off); if(back) m.rotation.y=Math.PI; m.renderOrder=5; return m; };
   return {cv,tex,meshes:[mk(false),mk(true)]};
 }
 function drawPad(pad,text,sub,col){
@@ -2478,14 +2515,14 @@ function drawPad(pad,text,sub,col){
   pad.tex.needsUpdate=true;
 }
 /* дверь: пивот на петле, закрытая — коллайдер, открытая — проход. Ширина 1.6 м — ровно проём. */
-const isDoorT = t => t==='door' || t==='mdoor';
+const isDoorT = t => t==='door' || t==='mdoor' || t==='adoor';
 function createDoor(metal){
-  const W=1.6, g = new THREE.Group(), pivot = new THREE.Group(); pivot.position.x = -W/2; g.add(pivot);
-  const m = new THREE.Mesh(new THREE.BoxGeometry(W,2.6,0.1), metal ? new THREE.MeshStandardMaterial({map:loadTex(TEXTURES.tex_rustdoor,1,1), color:0xffffff, roughness:0.7, metalness:0.3}) : makeBuildMat()); m.position.x = W/2; pivot.add(m);
+  const TH = metal==='armor' ? 0.18 : 0.1, W=1.6, g = new THREE.Group(), pivot = new THREE.Group(); pivot.position.x = -W/2; g.add(pivot);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(W,2.6,TH), metal ? new THREE.MeshStandardMaterial({map:loadTex(metal==='armor'?TEXTURES.tex_adoor:TEXTURES.tex_iron,1,metal==='armor'?1:1.6), color:0xffffff, roughness:0.5, metalness:0.35}) : (()=>{ const dm=makeBuildMat('tex_wood'); dm.color.set(0xc89a66); return dm; })()); m.position.x = W/2; pivot.add(m);
   const dark = new THREE.MeshStandardMaterial({color:0x2a2a2a, roughness:0.5, metalness:0.6});
-  const knob = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.22), dark); knob.position.set(1.5,-0.25,0); pivot.add(knob);
-  const lk = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.26), new THREE.MeshStandardMaterial({color:0xb8952a, roughness:0.4, metalness:0.7})); lk.position.set(1.5,0.05,0); lk.visible = false; pivot.add(lk);
-  const pad = makePad(); pad.meshes.forEach(p=>{ p.visible=false; pivot.add(p); }); drawPad(pad,'','');
+  const knob = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,TH+0.1), dark); knob.position.set(1.42,-0.2,0); pivot.add(knob);
+  const lk = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.2,TH+0.08), new THREE.MeshStandardMaterial({color:0xd4a62a, roughness:0.3, metalness:0.85, emissive:0x3a2a00})); lk.position.set(1.42,0.05,0); lk.visible = false; pivot.add(lk);
+  const pad = makePad(TH); pad.meshes.forEach(p=>{ p.visible=false; pivot.add(p); }); drawPad(pad,'','');
   const hit = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.5), new THREE.MeshBasicMaterial({visible:false})); hit.position.set(1.45,-0.1,0); pivot.add(hit); g.userData.hit = hit;
   g.userData.pivot = pivot; g.userData.door = m; g.userData.lock = lk; g.userData.pad = pad;
   return g;
@@ -2552,15 +2589,20 @@ function createQuarry(){      // карьер: каменное основани
 function createFurnace(){     // глиняная печь на каменном основании с огнём в устье; перёд — +Z
   const g = new THREE.Group(), Q = _qMats();
   const add = (geo,m,x,y,z,rx,ry,rz)=>{ const o = new THREE.Mesh(geo,m); o.position.set(x,y,z); if(rx||ry||rz) o.rotation.set(rx||0,ry||0,rz||0); g.add(o); return o; };
-  add(new THREE.CylinderGeometry(0.66,0.7,0.3,16),Q.stone, 0,0.15,0);
-  for(let i=0;i<9;i++){ const a=i/9*Math.PI*2+0.2, o=add(new THREE.DodecahedronGeometry(0.17+(i%3)*0.03,0),Q.rock, Math.cos(a)*0.66,0.2,Math.sin(a)*0.66, i,i*2,0); o.scale.y=0.8; }
-  const pts=[[0.5,0.28],[0.52,0.45],[0.5,0.7],[0.42,0.95],[0.3,1.18],[0.2,1.36],[0.2,1.46]].map(p=>new THREE.Vector2(p[0],p[1]));
-  add(new THREE.LatheGeometry(pts,20),Q.clay, 0,0,0); add(new THREE.TorusGeometry(0.2,0.035,8,16),Q.dark, 0,1.46,0, Math.PI/2,0,0);
-  add(new THREE.BoxGeometry(0.46,0.4,0.2),Q.dark, 0,0.55,0.46);                               // устье
-  add(new THREE.BoxGeometry(0.12,0.46,0.2),Q.stone, -0.3,0.55,0.46); add(new THREE.BoxGeometry(0.12,0.46,0.2),Q.stone, 0.3,0.55,0.46); add(new THREE.BoxGeometry(0.72,0.1,0.2),Q.stone, 0,0.82,0.46);
-  add(new THREE.PlaneGeometry(0.34,0.26),Q.fire, 0,0.5,0.565); add(new THREE.ConeGeometry(0.1,0.22,6),Q.fire2, 0,0.46,0.55);
+  const V=(x,y)=>new THREE.Vector2(x,y), iron=_ironMat();
+  add(new THREE.CylinderGeometry(0.74,0.78,0.16,20),Q.rock, 0,0.08,0);                      // плита-основание
+  add(new THREE.LatheGeometry([V(0.0,0.16),V(0.7,0.16),V(0.7,0.34),V(0.58,0.62),V(0.5,1.0),V(0.4,1.3),V(0.0,1.3)],22),Q.stone, 0,0,0);   // каменный конус
+  [0.46,0.84,1.14].forEach((y,i)=>{ const r=[0.66,0.52,0.43][i]; add(new THREE.TorusGeometry(r,0.028,6,24),iron, 0,y,0, Math.PI/2,0,0); });   // железные обручи
+  add(new THREE.CylinderGeometry(0.14,0.16,0.55,12),iron, 0,1.56,0); add(new THREE.TorusGeometry(0.15,0.03,6,12),iron, 0,1.84,0, Math.PI/2,0,0);   // труба
+  add(new THREE.BoxGeometry(0.66,0.6,0.16),iron, 0,0.5,0.6); add(new THREE.BoxGeometry(0.46,0.42,0.1),Q.dark, 0,0.5,0.6);   // железная рама и топка
+  add(new THREE.BoxGeometry(0.42,0.07,0.1),Q.fire, 0,0.33,0.66); [-0.28,0.28].forEach(x=>add(new THREE.CylinderGeometry(0.03,0.03,0.5,6),iron, x,0.5,0.69));
+  const fl=new THREE.Group(); fl.position.set(0,0.34,0.7);
+  const fm=_flameMat(); [0,Math.PI/2.6,-Math.PI/2.6].forEach((ry,i)=>{ const p=new THREE.Mesh(new THREE.PlaneGeometry(0.4,0.52),fm); p.position.y=0.18; p.rotation.y=ry; p.renderOrder=3; fl.add(p); });
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(0.4,0.36),new THREE.MeshBasicMaterial({color:0xff7a1a,transparent:true,opacity:0.85,depthWrite:false})); glow.position.set(0,0.16,-0.02); glow.renderOrder=2; fl.add(glow);
+  /* свет печки — один общий furnLight (число источников постоянно) */
   mergeGroupByMaterial(g);
   g.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  fl.visible=false; g.add(fl); g.userData.fire = [fl];
   return g;
 }
 function createCupboard(){
@@ -2584,6 +2626,7 @@ const BUILD_TYPES = {
   wall:      { name:'Стена',     kind:'edge', make:createWall,       cost:{wood:10},           snapY:1.75,   needBelow:true },
   doorway:   { name:'Проём',     kind:'edge', make:createDoorway,    cost:{wood:10},               snapY:1.75,   needBelow:true },
   mdoor:     { name:'Железная дверь', kind:'edge', make:()=>createDoor(true), cost:{mdoor:1}, snapY:1.3, needDoorway:true },
+  adoor:     { name:'Бронированная дверь', kind:'edge', make:()=>createDoor('armor'), cost:{adoor:1}, snapY:1.3, needDoorway:true },
   door:      { name:'Дверь',     kind:'edge', make:createDoor,       cost:{door:1},                snapY:1.3,  needDoorway:true },
   shootwall: { name:'Бойница',   kind:'edge', make:createShootWall,  cost:{wood:15},               snapY:1.75,   needBelow:true },
   parapet:   { name:'Бруствер',  kind:'edge', make:createParapet,    cost:{wood:8},                snapY:1.75,   needBelow:true },
@@ -2594,9 +2637,9 @@ const BUILD_TYPES = {
   furnace:   { name:'Печка',     kind:'obj',  make:createFurnace,    cost:{furnace:1},            snapY:0 },
 };
 const BUILD_ORDER = ['foundation','wall','shootwall','doorway','floor','stairs','parapet'];
-const PLACE_HELD = {mdoor:1, door:1, cupboard:1, box:1, quarry:1, furnace:1};       // ставятся из рук, а не из меню плана
-const PART_MAX = {furnace:150, quarry:300, shootwall:200, parapet:150, stairs:150, foundation:250, floor:200, wall:200, doorway:200, door:200, mdoor:450, cupboard:150, box:150};
-const PART_NAME = {furnace:'Печка', quarry:'Карьер', shootwall:'Бойница', parapet:'Бруствер', stairs:'Лестница', foundation:'Фундамент', floor:'Пол', wall:'Стена', doorway:'Проём', door:'Дверь', mdoor:'Железная дверь', cupboard:'Шкаф', box:'Ящик'};
+const PLACE_HELD = {adoor:1, mdoor:1, door:1, cupboard:1, box:1, quarry:1, furnace:1};       // ставятся из рук, а не из меню плана
+const PART_MAX = {furnace:150, quarry:300, shootwall:200, parapet:150, stairs:150, foundation:250, floor:200, wall:200, doorway:200, door:200, mdoor:450, adoor:800, cupboard:150, box:150};
+const PART_NAME = {furnace:'Печка', quarry:'Карьер', shootwall:'Бойница', parapet:'Бруствер', stairs:'Лестница', foundation:'Фундамент', floor:'Пол', wall:'Стена', doorway:'Проём', door:'Дверь', mdoor:'Железная дверь', adoor:'Бронированная дверь', cupboard:'Шкаф', box:'Ящик'};
 const WEAPON_DMG = {rock:10, rifle:20, pistol:25, berdanka:35, smg:18, axe:15, pickaxe:12, spear:25, knife:28};
 const BUILD_DMG_K = 0.1;        // по постройкам оружие бьёт в 10 раз слабее, чем по человеку
 const CUP_R = 30, DECAY_MIN = 180;   // шкаф защищает от гниения в радиусе 30 м; без шкафа деталь гниёт целиком за 3 часа
@@ -2641,6 +2684,7 @@ const CRAFT_RECIPES = [
   // --- предметы ---
   // --- стройка ---
   { id:'hammer',  cat:'tools', name:'Киянка', desc:'Снос и подбор построек, пока с постройки прошло меньше 10 минут. Улучшение стен и пола в камень (×2 прочность).', icon:ITEM_DEFS.hammer.icon, time:6, cost:{wood:60,stone:15}, give:{item:'hammer'} },
+  { id:'adoor',   cat:'build', name:'Бронированная дверь', desc:'Прочность 800. Возьмите в руки и поставьте в проём.', icon:ITEM_DEFS.adoor.icon, time:20, cost:{metal:200}, give:{item:'adoor'} },
   { id:'mdoor',   cat:'build', name:'Железная дверь', desc:'Прочность 450. Возьмите в руки и поставьте в проём.', icon:ITEM_DEFS.mdoor.icon, time:12, cost:{metal:80}, give:{item:'mdoor'} },
   { id:'door',    cat:'build', name:'Дверь', desc:'Возьмите в руки, встаньте у проёма и нажмите «Удар». Кодовый замок ставится прямо на двери.', icon:ITEM_DEFS.door.icon, time:8, cost:{wood:50}, give:{item:'door'} },
   { id:'cupboard',cat:'build', name:'Шкаф', desc:'Постройки в радиусе 30 м не гниют. Ставится на фундамент или пол.', icon:ITEM_DEFS.cupboard.icon, time:10, cost:{wood:100,cloth:10}, give:{item:'cupboard'} },
@@ -2681,9 +2725,9 @@ function repairTarget(itemKey){
   return sl.d < TOOL_MAX_DUR[itemKey] ? sl : 'full';
 }
 /* реальное время крафта (секунды на 1 партию), как в Rust */
-const CRAFT_CAT_MAP = {axe:'tools',pickaxe:'tools',hammer:'tools',spear:'weapons',knife:'weapons',rifle:'weapons',berdanka:'weapons',smg:'weapons',pistol:'weapons',satchel:'weapons',grenade:'weapons',rpg:'weapons',holo_sight:'weapons',ammo_pistol:'ammo',ammo_rifle:'ammo',rocket:'ammo',gunpowder:'ammo',eod_suit:'armor',nails:'comp',sheet:'comp',gear:'comp',pipe:'comp',fuel:'comp',plan:'build',door:'build',mdoor:'build',cupboard:'build',box:'build',furnace:'mech',quarry:'mech',copter:'mech'};
+const CRAFT_CAT_MAP = {axe:'tools',pickaxe:'tools',hammer:'tools',spear:'weapons',knife:'weapons',rifle:'weapons',berdanka:'weapons',smg:'weapons',pistol:'weapons',satchel:'weapons',grenade:'weapons',rpg:'weapons',holo_sight:'weapons',ammo_pistol:'ammo',ammo_rifle:'ammo',rocket:'ammo',gunpowder:'ammo',eod_suit:'armor',nails:'comp',sheet:'comp',gear:'comp',pipe:'comp',fuel:'comp',plan:'build',door:'build',mdoor:'build',adoor:'build',cupboard:'build',box:'build',furnace:'mech',quarry:'mech',copter:'mech'};
 CRAFT_RECIPES.forEach(r=>{ if(CRAFT_CAT_MAP[r.id]) r.cat = CRAFT_CAT_MAP[r.id]; });
-const CRAFT_TIME = {axe:4,pickaxe:4,spear:5,knife:6,rifle:24,berdanka:20,satchel:12,smg:16,pistol:12,ammo_pistol:2,ammo_rifle:3,gunpowder:4,nails:2,sheet:2,gear:6,pipe:3,fuel:2,eod_suit:36,holo_sight:9,hammer:4,mdoor:9,door:4,cupboard:8,box:3,plan:2,copter:24,grenade:4,quarry:12,furnace:6,rpg:40,rocket:10};
+const CRAFT_TIME = {axe:4,pickaxe:4,spear:5,knife:6,rifle:24,berdanka:20,satchel:12,smg:16,pistol:12,ammo_pistol:2,ammo_rifle:3,gunpowder:4,nails:2,sheet:2,gear:6,pipe:3,fuel:2,eod_suit:36,holo_sight:9,hammer:4,mdoor:9,adoor:20,door:4,cupboard:8,box:3,plan:2,copter:24,grenade:4,quarry:12,furnace:6,rpg:40,rocket:10};
 CRAFT_RECIPES.forEach(r=>{ if(CRAFT_TIME[r.id]) r.time = CRAFT_TIME[r.id]; });
 /* очередь: не больше 3 РАЗНЫХ предметов одновременно; ресурсы списываются при постановке, партии делаются по одной */
 const craftQueue = [], CRAFT_Q_MAX = 3;
@@ -3084,7 +3128,12 @@ function confirmBuild(){
   const p = ghostMesh.userData.pl;
   if(!p || !p.ok){ showToast(ghostWhy||'Нельзя построить'); OSIL_AUDIO.play('rust-door-denied'); return false; }
   const cost = p.bt.cost;
-  Object.keys(cost).forEach(k => removeItem(k, cost[k]));
+  const _held = heldPlace();   // предмет из рук тратится именно с выбранного слота хотбара
+  Object.keys(cost).forEach(k => {
+    let n = cost[k];
+    if(_held === k){ const sl = hotbarSlots[selectedSlot]; if(sl && sl.k === k){ const t = Math.min(sl.n, n); sl.n -= t; n -= t; if(sl.n <= 0) setAt({t:'h',i:selectedSlot}, null); } }
+    if(n > 0) removeItem(k, n);
+  });
   spawnBuilt(currentBuildType, p.x,p.y,p.z,p.rotY,p.level,p.base);
   if(window.OSIL_NET) OSIL_NET.onBuild({t:'bd',k:currentBuildType,x:p.x,y:p.y,z:p.z,r:p.rotY,l:p.level,b:p.base});
   OSIL_AUDIO.play('build');
@@ -3147,13 +3196,13 @@ function computeStability(){
     });
   }
   parts.forEach(p=>{
-    if(res.has(p.id) || p.type==='door' || p.type==='mdoor'){ return; }
+    if(res.has(p.id) || p.type==='door' || (p.type==='mdoor'||p.type==='adoor')){ return; }
     if(p.type==='stairs' || p.type==='box' || p.type==='cupboard' || p.type==='furnace'){
       const d = cellSup.get(cellKey(snapCell(p.x),snapCell(p.z),p.level)); if(d!==undefined) res.set(p.id, d);
       else if(p.level===0 && p.type!=='stairs' && !cells.has(cellKey(snapCell(p.x),snapCell(p.z),0))) res.set(p.id, 0);   // на земле
     } else if(p.type==='quarry') res.set(p.id, 0);
   });
-  parts.forEach(p=>{ if((p.type==='door'||p.type==='mdoor')){ const d = edgeSup.get(edgeKey(p.x,p.z,p.level)); if(d!==undefined) res.set(p.id, d); } });
+  parts.forEach(p=>{ if((p.type==='door'||(p.type==='mdoor'||p.type==='adoor'))){ const d = edgeSup.get(edgeKey(p.x,p.z,p.level)); if(d!==undefined) res.set(p.id, d); } });
   _stabCache = res; _stabCacheVer = _stabVer; return res;
 }
 function stabPct(p){ const d = computeStability().get(p.id); return d===undefined ? 0 : Math.max(10, 100 - 8*d); }
@@ -3194,7 +3243,7 @@ function removePart(id, fx){
   else if(t==='box' || t==='cupboard'){ spillStorage(id,p); storData.delete(id); if(storOpenId===id) closeStorage(); }
   else if(t==='quarry'){ quarState.delete(id); if(quarOpenId===id) closeQuarry(); }
   else if(t==='furnace'){ furnState.delete(id); if(furOpenId===id) closeFurnace(); }
-  if(!_stabBusy && t!=='door' && t!=='mdoor' && t!=='box' && t!=='cupboard' && t!=='quarry' && t!=='furnace') collapseUnsupported();
+  if(!_stabBusy && t!=='door' && t!=='mdoor' && t!=='adoor' && t!=='box' && t!=='cupboard' && t!=='quarry' && t!=='furnace') collapseUnsupported();
 }
 function damagePart(id, dmg){
   const p = parts.get(id); if(!p) return;
@@ -3202,14 +3251,33 @@ function damagePart(id, dmg){
   if(p.hp <= 0) removePart(id, true);
 }
 /* удар/выстрел по постройке. В мультиплеере урон считает сервер, в одиночной игре — тут. */
+const PART_MATERIAL = {mdoor:'metal', adoor:'metal', quarry:'metal', furnace:'stone'};   // остальное — дерево
+const _gHit = new THREE.Vector3();
+/* точка попадания луча в землю (шагаем по лучу, пока он не уйдёт под рельеф); null — не попали или вода */
+function groundRayHit(range, step){
+  aimRay(range); const o = _bRay.ray.origin, d = _bRay.ray.direction;
+  for(let t=step; t<=range; t+=step){
+    const x=o.x+d.x*t, y=o.y+d.y*t, z=o.z+d.z*t, h=heightAt(x,z);
+    if(y<=h){ if(h<0.02) return null; return _gHit.set(x,h+0.03,z); }
+  }
+  return null;
+}
+function groundImpact(pt, strong){
+  spawnDebris(pt,'dirt',strong?8:5,strong?0.9:0.7);
+  fxEmit('smoke', pt.clone(), new THREE.Vector3((Math.random()-.5)*0.5,0.4+Math.random()*0.4,(Math.random()-.5)*0.5), 0.7, 0.14, 0.55, 0xb8ad94, 0xd8d0bd, {drag:1.5, a:0.4});
+}
 function hitBuildingRay(w, range){
   if(copter.exists && hitCopterRay(w, range)) return true;
   if(!partMeshes.length || !WEAPON_DMG[w]) return false;
   aimRay(range);
   const hit = _bRay.intersectObjects(partMeshes, false)[0]; if(!hit) return false;
   const id = hit.object.userData.partId, p = parts.get(id); if(!p) return false;
-  lastHitPoint.copy(hit.point); hitFx(hit.point, 'wood');
-  if(range < 10) OSIL_AUDIO.play('chop');
+  lastHitPoint.copy(hit.point);
+  const _pm = PART_MATERIAL[p.type] || 'wood';
+  hitFx(hit.point, _pm);
+  if(_pm==='metal') OSIL_AUDIO.play('hit_stone',{rate:range<10?1.7:2.1,vol:range<10?1:0.6});
+  else if(_pm==='stone') OSIL_AUDIO.play('hit_stone',{rate:range<10?0.9:1.2,vol:range<10?1:0.55});
+  else OSIL_AUDIO.play(range<10?'chop':'hit_tree',range<10?undefined:{rate:1.3,vol:0.5});
   p.hitT = performance.now();
   if(window.OSIL_NET && OSIL_NET.on) OSIL_NET.onBuild({t:'bh', id, w});
   else damagePart(id, WEAPON_DMG[w]*BUILD_DMG_K);
@@ -3379,9 +3447,9 @@ function applyUpgrade(id, init, lvl){
   const newMax = base*(target===1?2:4);
   if(!init) p.hp += newMax-p.max;
   p.max = newMax; p.up = target;
-  const tex = target===1 ? loadTex(TEXTURES.tex_stone,1,1) : loadTex(TEXTURES.tex_metal,1,1);
+  const tex = target===1 ? loadTex(TEXTURES.tex_stone,1,1) : loadTex(TEXTURES.tex_iron,1,1);
   p.obj.traverse(o=>{ if(o.isMesh && o.material && !o.userData.noUp && !(o.material.metalness>0.5 && target===1)){
-    o.material = o.material.clone(); o.material.map = tex; o.material.color.set(target===2?0xb9bcc4:0xffffff);
+    o.material = o.material.clone(); o.material.map = tex; o.material.color.set(target===2?0xd4d8de:0xffffff);
     if(target===2){ o.material.metalness=0.55; o.material.roughness=0.5; } o.material.needsUpdate = true; } });
 }
 function demolishPart(p){
@@ -3424,7 +3492,7 @@ function updateHammerPrompt(dt){
   hmTarget = p; hmEl.style.display = p ? 'flex' : 'none';
   if(!p) return;
   const left = p.tm ? Math.max(0, DEMOLISH_MS-(Date.now()-p.tm)) : 0;
-  const pick = (p.type==='copterp'||p.type==='door'||p.type==='mdoor'||p.type==='box'||p.type==='cupboard'||p.type==='quarry'||p.type==='furnace');
+  const pick = (p.type==='copterp'||p.type==='door'||(p.type==='mdoor'||p.type==='adoor')||p.type==='box'||p.type==='cupboard'||p.type==='quarry'||p.type==='furnace');
   const d = document.getElementById('hm-dem'), u = document.getElementById('hm-up');
   d.style.display = left>0 ? '' : 'none';
   d.textContent = (pick?'ПОДОБРАТЬ':'СНЕСТИ')+' ('+Math.floor(left/60000)+':'+String(Math.floor(left/1000)%60).padStart(2,'0')+')';
@@ -3966,6 +4034,7 @@ const DEBRIS_COLORS = {
   metal:[0xb87a4a,0x8d8d8d,0xd08a50,0x6f6f6f],
   scrap:[0x8a3b2a,0x3a3a3e,0x8d8d8d,0xb8a820]
 };
+DEBRIS_COLORS.dirt=[0x8a6d45,0x6b5233,0xa88a5c,0x5a4528];
 DEBRIS_COLORS.sulfur=[0xd8ca2a,0xe6d84a,0x8d8d8d,0xb8a820];
 const DEBRIS_MAX = 120;
 const debrisGeo = new THREE.BoxGeometry(1,1,1);
@@ -4350,7 +4419,11 @@ function applyToolHit(){
   if(kind==='hammer'){ OSIL_AUDIO.play('chop',{vol:0.5,rate:1.3}); return; }
   if(boarMelee(kind)) return;
   const target = findTargetInReach();
-  if(!target){ OSIL_AUDIO.play('empty',{vol:0.35}); return; }   // промах — прочность не тратится
+  if(!target){
+    const gp = groundRayHit(3.3, 0.15);
+    if(gp && kind!=='knife'){ lastHitPoint.copy(gp); groundImpact(gp, true); OSIL_AUDIO.play('hit_stone',{rate:0.75,vol:0.55}); camKick = 0.02; return; }   // удар по земле
+    OSIL_AUDIO.play('empty',{vol:0.35}); return;   // промах — прочность не тратится
+  }
   if(target.type==='carcass'){ carcassHit(target); wearTool(kind,1); return; }
   if(target.type==='scrap'){ hitBarrel(target); wearTool(kind,1); return; }
   if(window.OSIL_NET && OSIL_NET.on && target.nid!=null){        // онлайн: количество, урон узлу и лут считает сервер
@@ -4414,13 +4487,14 @@ function updateStatsUI(){
 
 /* ---------------- FPS counter ---------------- */
 const fpsEl = document.getElementById('fps-counter');
-let fpsFrames = 0, fpsLast = performance.now();
+let fpsFrames = 0, fpsLast = performance.now(), _msPrev = 0, _msMax = 0;
 function updateFPS(now){
   fpsFrames++;
+  if(_msPrev){ const d = now - _msPrev; if(d > _msMax) _msMax = d; } _msPrev = now;
   if(now - fpsLast >= 500){
     const fps = Math.round(fpsFrames*1000/(now-fpsLast));
     if(fpsEl){
-      fpsEl.textContent = fps + ' FPS';
+      fpsEl.textContent = fps + ' FPS · ' + (1000/Math.max(1,fps)).toFixed(1) + ' мс (пик ' + _msMax.toFixed(0) + ') · ' + Math.round(1000/_refreshMs) + ' Гц'; _msMax = 0;
     }
     fpsFrames = 0; fpsLast = now;
     if(CFG.ultra && !document.hidden){          // УЛЬТРА: подстраиваем разрешение так, чтобы держать 60 FPS
@@ -5199,7 +5273,7 @@ function drawMini(){
 let miniT = 0;
 function updateMinimap(dt){
   miniT += dt; if(miniT < 0.1) return; miniT = 0;
-  if(mapOpen) return;
+  if(mapOpen || !CFG.minimap) return;   // миникарта скрыта — не рисуем её 10 раз/с впустую
   drawMini();
 }
 function toggleMap(force){
@@ -5745,8 +5819,8 @@ document.addEventListener('visibilitychange', ()=>{ _prevRafTs = 0; _rafDeltas.l
 
 /* ================= Дорога, бочки, заправка, Агропром, боты ================= */
 function roadZ(x){ return 0.04*WORLD_SIZE*Math.sin(x/WORLD_SIZE*7.5); }
-const GS = {x:0, z:-15}, AG = {x:78, z:-74};
-const POIS = [{x:GS.x,z:GS.z,name:'Заправка',col:'#ff9d2e'},{x:AG.x,z:AG.z,name:'Агропром',col:'#e0432b'}];
+const GS = {x:0, z:-15}, AG = {x:78, z:-74}, DC = {x:68, z:88};
+const POIS = [{x:GS.x,z:GS.z,name:'Заправка',col:'#ff9d2e'},{x:AG.x,z:AG.z,name:'Агропром',col:'#e0432b'},{x:DC.x,z:DC.z,name:'Пустынный город',col:'#e8c04a'}];
 const roadBarrels = [], crates = [], bots = [], botTr = [], _trPool = [];
 const botTrMat = new THREE.LineBasicMaterial({color:0xffd27a});
 const _lm = c=>new THREE.MeshStandardMaterial({color:c,roughness:0.85,flatShading:true});
@@ -5827,7 +5901,7 @@ function _initRoadWorld(){
   const __before=new Set(scene.children);
   const inFence=(p,c,hx,hz)=>Math.abs(p.x-c.x)<hx&&Math.abs(p.z-c.z)<hz;
   harvestables.slice().forEach(h=>{ const p=h.mesh.position; if(h.type==='carcass') return;
-    if(Math.abs(p.z-roadZ(p.x))<(h.type==='scrap'?5:8)&&Math.abs(p.x)<115 || Math.hypot(p.x-GS.x,p.z-GS.z)<24 || inFence(p,AG,26,22)) destroyHarvestable(h); });
+    if(Math.abs(p.z-roadZ(p.x))<(h.type==='scrap'?5:8)&&Math.abs(p.x)<115 || Math.hypot(p.x-GS.x,p.z-GS.z)<24 || inFence(p,AG,26,22) || inFence(p,DC,30,26)) destroyHarvestable(h); });
   makeRoadMesh();
   for(let x=-105,n=0;x<=105;x+=30,n++){   // бочки на обочинах
     const side=n%2?1:-1, bx=x+(Math.random()-0.5)*8, bz=roadZ(bx)+side*(6.4+Math.random()*1.0);
@@ -5930,6 +6004,50 @@ function _initRoadWorld(){
     [[-8,0],[6,-4],[0,8],[12,-6]].forEach(p=>{ const b=makeBot(X+p[0],Z+p[1]); b.yaw=Math.random()*6; });
     agMerge(__ag0, X, y0, Z); }
 
+  { /* ===== ПУСТЫННЫЙ ГОРОД (лёгкий: ~60 боксов склеиваются в несколько мешей, 3 бота, 3 ящика) ===== */
+    const __dc0=new Set(scene.children);
+    const X=DC.x, Z=DC.z, y0=heightAt(X,Z);
+    const M=(c,r,m)=>new THREE.MeshStandardMaterial({color:c,roughness:r===undefined?0.92:r,metalness:m||0,flatShading:true});
+    const sand=M(0xd8b97a), wallM=M(0xc9a66b), wallD=M(0xa98350), woodM=M(0x6b4a2e), dark=M(0x2c2e31,0.6,0.4), rustM=M(0x7a4a2e,0.8,0.4), stoneM=M(0x8d8a80), trunkM=M(0x7a5a3a), leafM=M(0x4f7a32);
+    const cloths=[M(0xb23a2e),M(0x2e6f8e),M(0xd9a21b)];
+    const bx=(w,h,d,m,x,y,z,c,ry)=>{ const o=boxAt(X,Z,w,h,d,m,x,y,z,false,y0); if(ry) o.rotation.y=ry; if(c) addCollider(o); return o; };
+    const cy=(r,h,m,x,y,z,c,seg,r2)=>{ const o=new THREE.Mesh(new THREE.CylinderGeometry(r2===undefined?r:r2,r,h,seg||10),m); o.position.set(X+x,y0+y+h/2,Z+z); o.castShadow=o.receiveShadow=true; scene.add(o); if(c) addCollider(o); return o; };
+    bx(46,0.08,38,sand,0,0,0,false);                                                   // утоптанная площадка
+    bx(46,0.1,5,wallD,0,0.02,0,false);                                                 // главная улица
+    const house=(x,z,w,d,h)=>{                                                          // дом: 4 стены, проём 1.8 м на юг, плоская крыша
+      const t=0.35, gw=1.8, wl=(w-gw)/2, off=(w+gw)/4;
+      bx(w,h,t,wallM,x,0,z-d/2,true); bx(t,h,d,wallM,x-w/2,0,z,true); bx(t,h,d,wallM,x+w/2,0,z,true);
+      bx(wl,h,t,wallM,x-off,0,z+d/2,true); bx(wl,h,t,wallM,x+off,0,z+d/2,true);
+      bx(gw,h-2.4,t,wallM,x,2.4,z+d/2,false);                                           // перемычка над проёмом
+      bx(w+0.5,0.3,d+0.5,wallD,x,h,z,true);                                             // крыша
+      bx(1.2,0.8,0.7,woodM,x-w/2+1.2,0,z-d/2+0.9,true);                                 // стол внутри
+    };
+    house(-14,-10,8,7,3.2); house(0,-11,7,6,3); house(14,-10,8,7,3.2);
+    house(-15,9,7,6,3); house(0,10,10,7,3.6); house(15,9,7,6,3);
+    // колодец на площади
+    cy(1.1,0.9,stoneM,0,0.1,2,true,12); cy(0.8,0.1,dark,0,0.95,2,false,12);
+    // водонапорная башня
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(q=> bx(0.25,5.5,0.25,rustM,-20+q[0],0,-1+q[1],true));
+    cy(2.0,2.4,rustM,-20,5.5,-1,true,14); cy(2.1,0.3,dark,-20,7.9,-1,false,14,0.6);
+    // рынок: 3 навеса с тканью
+    [[-8,-3.2],[8,-3.2],[8,3.4]].forEach((p,i)=>{
+      [[-1.2,-0.8],[1.2,-0.8],[-1.2,0.8],[1.2,0.8]].forEach(q=> bx(0.12,2.3,0.12,woodM,p[0]+q[0],0,p[1]+q[1],false));
+      bx(3.2,0.08,2.4,cloths[i%3],p[0],2.3,p[1],false,0.05); bx(2.2,0.9,0.9,woodM,p[0],0,p[1]-0.2,true);
+    });
+    // пальмы (ствол + 5 листьев)
+    [[-21,8],[-22,-9],[21,-7],[22,6],[-5,16],[11,16]].forEach(p=>{
+      cy(0.22,4.2,trunkM,p[0],0,p[1],true,7,0.14);
+      for(let i=0;i<5;i++){ const a=i*1.2566+p[0], f=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.07,0.55),leafM); f.position.set(X+p[0]+Math.cos(a)*1.0,y0+4.15,Z+p[1]+Math.sin(a)*1.0); f.rotation.set(0,-a,-0.4); f.castShadow=true; scene.add(f); }
+    });
+    // ржавые машины, бочки, обломок стены
+    bx(4.2,1.1,1.9,rustM,-4,0,-17,true,0.2); bx(2.0,0.8,1.8,dark,-4.2,1.1,-17.1,false,0.2); bx(4.0,1.0,1.8,rustM,17,0,16,true,-0.5);
+    [[-10,5],[-9.2,5.6],[19,0]].forEach(p=> cy(0.4,1.0,rustM,p[0],0,p[1],true,8));
+    bx(6,1.6,0.4,wallD,10,0,-2,true,0.1); bx(0.4,1.4,3,wallD,-11,0,-3,true);
+    // ЛУТ: 3 ящика («desert» — урезанный пул, см. takeLoot) и 3 бота
+    makeCrate(X-14,Z-11,y0+0.08,'desert'); makeCrate(X+0.5,Z+11.5,y0+0.08,'desert'); makeCrate(X+15,Z+10.5,y0+0.08,'desert');
+    [[-3,2],[9,-6],[0,9]].forEach(p=>{ const b=makeBot(X+p[0],Z+p[1]); b.yaw=Math.random()*6; });
+    agMerge(__dc0, X, y0, Z); }
+
   rebuildHarvestHitMap();
   scene.children.forEach(o=>{ if(!__before.has(o)&&!o.userData.road&&!bots.some(b=>b.rig.root===o)) registerCullable(o); });
   updateCulling(0,true);
@@ -6026,11 +6144,12 @@ function updateRoadWorld(dt){
 }
 function takeLoot(){
   const c=lootNear; if(!c||!c.ready) return false;
-  const pool=c.kind==='mil'?[['ammo_rifle',30,70],['ammo_pistol',20,40],['metal',60,150],['scrap',30,80],['gunpowder',10,30],['cloth',20,50],['fuel',10,25],['sulfur',15,40]]
+  const dsrt=c.kind==='desert';      // «Пустынный город»: скромный пул, макс. 3 предмета, респавн 15 мин (экономика не раздувается)
+  const pool=dsrt?[['scrap',10,25],['metal',15,40],['wood',20,50],['cloth',5,15],['fuel',3,8],['ammo_pistol',6,14]]:c.kind==='mil'?[['ammo_rifle',30,70],['ammo_pistol',20,40],['metal',60,150],['scrap',30,80],['gunpowder',10,30],['cloth',20,50],['fuel',10,25],['sulfur',15,40]]
                            :[['scrap',20,50],['metal',30,80],['ammo_rifle',20,45],['ammo_pistol',12,30],['wood',40,120],['cloth',10,30],['fuel',5,15],['sulfur',10,30]];
-  pool.sort(()=>Math.random()-0.5).slice(0,4).forEach(p=>{ const n=p[1]+Math.floor(Math.random()*(p[2]-p[1]+1)); if(!ITEM_DEFS[p[0]]) return; giveItem(p[0],n); showToast('+'+n+' '+(RES_NAMES[p[0]]||ITEM_DEFS[p[0]].name)); });
+  pool.sort(()=>Math.random()-0.5).slice(0,dsrt?3:4).forEach(p=>{ const n=p[1]+Math.floor(Math.random()*(p[2]-p[1]+1)); if(!ITEM_DEFS[p[0]]) return; giveItem(p[0],n); showToast('+'+n+' '+(RES_NAMES[p[0]]||ITEM_DEFS[p[0]].name)); });
   if(c.kind==='mil'&&Math.random()<0.08){ giveItem('eod_suit',1,600); showToast('+ Военная броня'); }
-  c.ready=false; c.t=600; c.lid.material.color.set(0x222222);
+  c.ready=false; c.t=dsrt?900:600; c.lid.material.color.set(0x222222);
   lootNear=null; doorUI.classList.remove('show'); try{ OSIL_AUDIO.play('close',{vol:0.6}); }catch(e){}
   updateResourceUI(); return true;
 }
@@ -6549,7 +6668,7 @@ function applySetting(k){
     SHADOW_R2 = (sd*1.2)*(sd*1.2); shadowDirty = true; updateCulling(0,true);
   }
   if(on('shadows') || on('shadowDist')){ SHADOW_TEXEL = (sun.shadow.camera.right*2)/sun.shadow.mapSize.x; }
-  if(on('fpsCap')){ const v=[30,60,90,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v : 0; lastTime = performance.now(); }
+  if(on('fpsCap')){ const v=[30,60,90,120,0][CFG.fpsCap]; FPS_CAP_MS = v ? 1000/v : 0; lastTime = performance.now(); }
   if(on('dist')){
     const far = Math.min(CFG.dist, FOG_MAX);   // туман гарантированно закрывает всё дальше FOG_MAX: ни ряби, ни пустоты под миром
     scene.fog.near = far*0.18; scene.fog.far = far; camera.far = far+10; camera.updateProjectionMatrix();
@@ -6906,7 +7025,7 @@ window.OSIL_NET = (function(){
     isAdmin(){ return !!(this.me && this.me.admin); },
     owns(id){ return !!(this.me && (this.me.items||[]).includes(id)); }
   };
-  setInterval(()=>{ if(OSIL_ACC.sess()) OSIL_ACC.refresh().then(()=>{ const p=document.getElementById('m-paneDonate'); if(p && !p.classList.contains('hidden')) renderDonate(); }); }, 6000);
+  setInterval(()=>{ const _ss=document.getElementById('start-screen'); if(document.hidden || (_ss && _ss.style.display==='none')) return; if(OSIL_ACC.sess()) OSIL_ACC.refresh().then(()=>{ const p=document.getElementById('m-paneDonate'); if(p && !p.classList.contains('hidden')) renderDonate(); }); }, 6000);
   const DON = {copter:{n:'Миникоптер', d:'Личный вертолёт: после покупки можно крафтить и ставить', icon:'1/copter.webp'}, quarry:{n:'Карьер', d:'Сам добывает камень, железо и серу: можно крафтить и ставить', icon:'1/quarry.webp'}, eod_suit:{n:'Военная броня', d:'Снижает урон на 75%', icon:'1/eod_suit.webp'}};
   const COIN_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><radialGradient id='g' cx='35%25' cy='30%25' r='80%25'><stop offset='0' stop-color='%23fff3a0'/><stop offset='.55' stop-color='%23f2b705'/><stop offset='1' stop-color='%23b36b00'/></radialGradient></defs><circle cx='32' cy='32' r='30' fill='%238a5200'/><circle cx='32' cy='32' r='27' fill='url(%23g)'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23b8780a' stroke-width='3'/><path d='M32 17v30M25 24h10a5 5 0 0 1 0 10h-8a5 5 0 0 0 0 10h12' fill='none' stroke='%238a5200' stroke-width='4' stroke-linecap='round'/></svg>";
   document.documentElement.style.setProperty('--coin', 'url("'+COIN_IMG+'")');

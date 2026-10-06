@@ -65,5 +65,19 @@ window.OSIL_AUDIO=(function(){
     const os=ctx.createOscillator(), og=ctx.createGain(); os.type='sine'; os.frequency.setValueAtTime(95,t); os.frequency.exponentialRampToValueAtTime(32,t+0.5);
     og.gain.setValueAtTime(v*0.9,t); og.gain.exponentialRampToValueAtTime(0.0001,t+0.6); os.connect(og); og.connect(master); os.start(t); os.stop(t+0.65);
   }
-  return {SFX,LOOPS,load,play,music,walk,unlock,setVolume,setVolumes,beep,boom};
+  /* треск горящей печки: процедурный шум, громкость по расстоянию (0..1) */
+  let fNode=null;
+  function furnace(v){
+    if(!ensure()) return;
+    if(!fNode){
+      if(v<=0) return;
+      const len=ctx.sampleRate*2, b=ctx.createBuffer(1,len,ctx.sampleRate), d=b.getChannelData(0); let lp=0;
+      for(let i=0;i<len;i++){ lp+=(Math.random()*2-1-lp)*0.08; d[i]=lp*1.8+(Math.random()<0.0015?(Math.random()*2-1)*1.2:0)+(Math.random()<0.0004?(Math.random()*2-1)*2:0); }
+      const src=ctx.createBufferSource(); src.buffer=b; src.loop=true;
+      const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=900; f.Q.value=0.5;
+      const g=ctx.createGain(); g.gain.value=0; src.connect(f); f.connect(g); g.connect(master); src.start(); fNode={g};
+    }
+    fNode.g.gain.setTargetAtTime(v*0.55*vol.sfx*vol.master,ctx.currentTime,0.15);
+  }
+  return {SFX,LOOPS,load,play,music,walk,unlock,setVolume,setVolumes,beep,boom,furnace};
 })();

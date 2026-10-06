@@ -15,7 +15,7 @@ window.OSIL_LOADER=(function(){
     $('ld-fill').style.width=(p*100)+'%'; $('ld-pct').textContent=Math.round(p*100)+'%';
     if(stage) $('ld-stage').textContent=stage; if(file!==undefined) $('ld-file').textContent=file;
   }
-  function show(){ el.classList.remove('out'); el.style.display='flex'; tip(); clearInterval(tipT); tipT=setInterval(tip,2600); }
+  function show(){ el.classList.remove('out'); el.style.display='flex'; if(window.__preHide) window.__preHide(); tip(); clearInterval(tipT); tipT=setInterval(tip,2600); }
   function hide(){ clearInterval(tipT); el.classList.add('out'); setTimeout(()=>{ el.style.display='none'; },500); }
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const frame=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
