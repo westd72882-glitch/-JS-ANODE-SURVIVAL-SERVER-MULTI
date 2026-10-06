@@ -367,8 +367,8 @@ cops = {}; COPL = threading.Lock(); _copsave = {}
 for _r in qa('SELECT u,j FROM copters'):
     try: cops[_r[0]] = json.loads(_r[1])
     except ValueError: pass
-PMAX = {'foundation': 250, 'floor': 200, 'wall': 200, 'doorway': 200, 'door': 200, 'mdoor': 450, 'cupboard': 150, 'box': 150, 'quarry': 300, 'furnace': 150}
-REFUND = {'furnace': ('furnace', 1), 'foundation': ('wood', 10), 'floor': ('wood', 8), 'wall': ('wood', 10), 'doorway': ('wood', 10), 'door': ('door', 1), 'mdoor': ('mdoor', 1), 'cupboard': ('cupboard', 1), 'box': ('box', 1), 'quarry': ('quarry', 1)}
+PMAX = {'foundation': 250, 'floor': 200, 'wall': 200, 'doorway': 200, 'door': 200, 'mdoor': 450, 'adoor': 800, 'cupboard': 150, 'box': 150, 'quarry': 300, 'furnace': 150}
+REFUND = {'furnace': ('furnace', 1), 'foundation': ('wood', 10), 'floor': ('wood', 8), 'wall': ('wood', 10), 'doorway': ('wood', 10), 'door': ('door', 1), 'mdoor': ('mdoor', 1), 'adoor': ('adoor', 1), 'cupboard': ('cupboard', 1), 'box': ('box', 1), 'quarry': ('quarry', 1)}
 UPGR = ('foundation', 'floor', 'wall', 'doorway')
 def pmax(b): return PMAX[b['k']] * (2 if b.get('u') else 1)
 SATCHEL_DMG, SATCHEL_FUSE = 75, 8.7        # сатчел: 75 урона любой детали через ~8.7 с (10 писков)
@@ -404,7 +404,7 @@ def part_id(b):
     if k == 'floor': return 'L:' + ck(x, z, l)
     if k == 'wall': return 'W:' + ek(x, z, l)
     if k == 'doorway': return 'D:' + ek(x, z, l)
-    if k in ('door', 'mdoor'): return 'O:' + ek(x, z, l)
+    if k in ('door', 'mdoor', 'adoor'): return 'O:' + ek(x, z, l)
     return {'box': 'B:', 'quarry': 'Q:'}.get(k, 'C:') + f'{jr(x * 10)},{jr(z * 10)},{l}'
 parts, prow = {}, {}
 for _rid, _j in qa('SELECT id,j FROM builds ORDER BY id'):
@@ -466,7 +466,7 @@ def unsupported_ids():
         k = b['k']
         if k == 'foundation' or k == 'quarry': continue
         if k == 'floor': ok = ck(b['x'], b['z'], b['l']) in cell
-        elif k in ('wall', 'doorway', 'door', 'mdoor'): ok = ek(b['x'], b['z'], b['l']) in edge
+        elif k in ('wall', 'doorway', 'door', 'mdoor', 'adoor'): ok = ek(b['x'], b['z'], b['l']) in edge
         elif k in ('box', 'cupboard'): ok = ck(jr(b['x'] / 4) * 4, jr(b['z'] / 4) * 4, b['l']) in cell or (b['l'] == 0 and ck(b['x'], b['z'], 0) not in {ck(c['x'], c['z'], 0) for _, c in items if c['k'] == 'foundation'})
         else: ok = True
         if not ok: dead.append(pid)
@@ -488,7 +488,7 @@ def destroy_part(pid, cascade=True, _chk=True):
     phpd.pop(pid, None); q('DELETE FROM bhp WHERE id=?', (pid,))
     broadcast({'t': 'bx', 'id': pid})
     if b['k'] == 'doorway' and cascade: destroy_part('O:' + pid[2:], False)
-    if b['k'] in ('door', 'mdoor'):
+    if b['k'] in ('door', 'mdoor', 'adoor'):
         lk = pid[2:]
         if locks.pop(lk, None) is not None: q('DELETE FROM locks WHERE k=?', (lk,))
         dauth_drop(lk)
