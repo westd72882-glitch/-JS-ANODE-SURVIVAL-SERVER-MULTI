@@ -3,6 +3,16 @@
 const KEY='%%KEY%%'; window.__SERVER='%%SERVER%%'; window.__APK=true;
 %%CIPHER%%
 (async function(){
+(function(){
+  var st=document.createElement('style'); st.textContent='#pre-load{position:fixed;inset:0;z-index:99999;background:linear-gradient(rgba(8,12,20,.8),rgba(8,12,20,.9)),#10131a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;color:#f6ece4}#pre-load .a{font-size:clamp(34px,9.5vh,60px);font-weight:900;letter-spacing:2px;line-height:.95}#pre-load .b{background:#f6ece4;color:#111;font-weight:900;font-size:clamp(11px,2.6vh,18px);letter-spacing:1px;padding:2px 8px;margin-top:2px;display:inline-block}#pre-load .s{position:absolute;left:50%;bottom:64px;width:34px;height:34px;margin-left:-17px;border:3px solid rgba(255,255,255,.18);border-top-color:#f6ece4;border-radius:50%;animation:prs .9s linear infinite}#pre-load .t{position:absolute;left:0;right:0;bottom:30px;text-align:center;font-size:14px;font-weight:700;letter-spacing:4px;color:#cfc9c2}@keyframes prs{to{transform:rotate(360deg)}}';
+  document.head.appendChild(st);
+  var d=document.createElement('div'); d.id='pre-load'; d.innerHTML='<div class="a">ANODE</div><div class="b">SURVIVAL ISLAND</div><div class="s"></div><div class="t" id="pre-t">ЗАГРУЗКА</div>';
+  document.body.appendChild(d);
+  window.__preSet=function(t){ var e=document.getElementById('pre-t'); if(e) e.textContent=t; };
+  window.__preHide=function(){ var e=document.getElementById('pre-load'); if(e) e.remove(); };
+})();
+const yieldUI=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
+  __preSet('ЗАГРУЗКА РЕСУРСОВ…'); await yieldUI();
   const buf=new Uint8Array(await (await fetch('a.dat')).arrayBuffer()), files=unpack(buf,KEY), blobs=new Map(), dec=new TextDecoder();
   const NORM=u=>{ u=String(u==null?'':u); if(/^(blob|data):/.test(u)) return null; u=u.split('#')[0].split('?')[0].replace(location.origin+'/','').replace(/^(\.{0,2}\/)+/,''); return u; };
   const getUrl=k=>{ if(!blobs.has(k)){ const f=files.get(k); blobs.set(k,URL.createObjectURL(new Blob([f.d],{type:f.m}))); } return blobs.get(k); };
@@ -22,6 +32,7 @@ const KEY='%%KEY%%'; window.__SERVER='%%SERVER%%'; window.__APK=true;
   const of=window.fetch; window.fetch=function(i,o){ if(typeof i==='string'){ const r=RES(i); if(r) return of.call(this,r,o); } return of.call(this,i,o); };
   const xo=XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open=function(m,u){ const a=[].slice.call(arguments); if(typeof u==='string') a[1]=ru(u); return xo.apply(this,a); };
   const OA=window.Audio; window.Audio=function(s){ return s?new OA(ru(s)):new OA(); }; window.Audio.prototype=OA.prototype;
+  __preSet('ЗАГРУЗКА ИГРЫ…'); await yieldUI();
   /* страница */
   const doc=new DOMParser().parseFromString(fix(text('index.html')),'text/html');
   const scripts=[].slice.call(doc.querySelectorAll('script')); scripts.forEach(s=>s.remove());

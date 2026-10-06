@@ -14,7 +14,7 @@ function xs(buf, key, idx){
 function unpack(buf, key){
   var il=(buf[0]|(buf[1]<<8)|(buf[2]<<16)|(buf[3]<<24))>>>0;
   var idx=JSON.parse(new TextDecoder().decode(xs(buf.slice(4,4+il),key,-1))), base=4+il, out=new Map();
-  Object.keys(idx).forEach(function(p){ var e=idx[p]; out.set(p,{m:e[2],d:xs(buf.slice(base+e[0],base+e[0]+e[1]),key,e[3])}); });
+  Object.keys(idx).forEach(function(p){ var e=idx[p]; var o={m:e[2]}, c=null; Object.defineProperty(o,'d',{get:function(){ if(!c) c=xs(buf.slice(base+e[0],base+e[0]+e[1]),key,e[3]); return c; }}); out.set(p,o); });
   return out;
 }
 if(typeof module!=='undefined') module.exports={xs:xs,unpack:unpack};
