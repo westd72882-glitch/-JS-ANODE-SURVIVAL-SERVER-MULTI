@@ -1,4 +1,4 @@
-const APP_VER = '__APP_VER__', APP_SIG = '__APP_SIG__';   // подставляется при сборке APK (build-apk.yml)
+const APP_VER = window.__APP_VER || '16.9', APP_SIG = window.__APP_SIG || '';   // задаётся в js/version.js (при сборке APK подставляется build-apk.yml)
 (function(){
 "use strict";
 const CFG = OSIL_SETTINGS.all;          // живые настройки (меню → localStorage)
@@ -7051,40 +7051,11 @@ window.OSIL_NET = (function(){
   function setPName(n){ const e = document.getElementById('m-pName'); if(e && n) e.textContent = n; }
   let curSrv = null;
   function showAuth(s, note, onOk, force){
-    const old = document.getElementById('auth-ov'); if(old) old.remove();
-    const ov = document.createElement('div'); ov.id = 'auth-ov';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);box-sizing:border-box;font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;background:linear-gradient(rgba(8,12,20,.72),rgba(8,12,20,.82)),url(1/menu-bg-update.webp) center/cover no-repeat,#10131a';
-    const I = 'width:100%;box-sizing:border-box;padding:clamp(7px,1.6vh,12px) 14px;margin:clamp(3px,.6vh,5px) 0;border:1px solid #3a423d;background:rgba(14,18,16,.92);color:#fff;font-size:16px;letter-spacing:.5px;outline:none;border-radius:0';
-    const B = 'flex:1;padding:clamp(8px,1.8vh,14px) 6px;border:0;border-radius:0;background:#1b231f;color:#f3ece6;font-size:clamp(13px,2.2vh,17px);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border-bottom:3px solid #4c6a58';
-    ov.innerHTML = '<div style="display:flex;align-items:center;gap:14px;margin-bottom:clamp(6px,2vh,16px)"><img src="1/icon-192.png" style="width:clamp(40px,10vh,74px);height:clamp(40px,10vh,74px);box-shadow:0 4px 14px rgba(0,0,0,.6)" alt=""><div style="line-height:.95"><div style="font-size:clamp(30px,8.5vh,54px);font-weight:900;color:#f6ece4;letter-spacing:2px">ANODE</div><div style="background:#f6ece4;color:#111;font-weight:900;font-size:clamp(11px,2.4vh,17px);letter-spacing:1px;padding:2px 8px;display:inline-block">SURVIVAL ISLAND</div></div></div>' +
-      '<div style="width:min(90vw,360px);background:rgba(20,26,23,.9);padding:clamp(8px,1.6vh,14px) 16px;color:#eee;box-shadow:0 8px 30px rgba(0,0,0,.6)">' +
-      '<div id="au-t" style="font-size:15px;font-weight:700;letter-spacing:1px;color:#cfe6d6;margin-bottom:6px;text-transform:uppercase"></div>' +
-      '<input id="au-u" style="'+I+'" placeholder="НИК (3–16 символов)" maxlength="16" autocapitalize="off" autocomplete="username">' +
-      '<input id="au-p" type="password" style="'+I+'" placeholder="ПАРОЛЬ (от 6 символов)" maxlength="64" autocomplete="current-password">' +
-      '<div id="au-e" style="color:#ff8a80;font-size:13px;min-height:clamp(12px,2vh,18px);margin:2px 0 clamp(3px,1vh,8px)"></div>' +
-      '<div style="display:flex;gap:8px"><button id="au-l" style="'+B+'">Войти</button><button id="au-r" style="'+B+'">Регистрация</button></div>' +
-      '<label style="display:flex;gap:8px;align-items:center;margin-top:clamp(5px,1.4vh,12px);font-size:12px;color:#c9c4bd"><input id="au-ok" type="checkbox" checked style="width:18px;height:18px"><span>Я прочитал и согласился с <span style="color:#4fd1c5">политикой конфиденциальности</span> и <span style="color:#4fd1c5">условиями использования</span></span></label>' +
-      '<button id="au-c" style="width:100%;margin-top:clamp(2px,.8vh,8px);padding:clamp(4px,1vh,10px);background:none;border:none;color:#9a968f;font-size:14px;'+(force?'display:none':'')+'">Отмена</button></div>';
-    document.body.appendChild(ov);
-    const $$ = id => ov.querySelector('#' + id), err = $$('au-e');
-    $$('au-t').textContent = 'Сервер «' + String(s.name || s.host).replace(/localhost/ig,'server') + '»'; if(note) err.textContent = note;
-    let busy = false;
-    const go = async kind => {
-      if(busy) return; const u = $$('au-u').value.trim(), p = $$('au-p').value;
-      if(!u || !p){ err.textContent = 'Введите ник и пароль'; return; }
-      if(!$$('au-ok').checked){ err.textContent = 'Нужно согласие с условиями'; return; }
-      busy = true; err.style.color = '#ccc'; err.textContent = 'Подождите…';
-      try{
-        const r = await fetch(baseUrl(s) + '/api/' + kind, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({u, p, v:APP_VER, s:APP_SIG})});
-        const d = await r.json();
-        if(!r.ok || !d.token){ err.style.color = '#ff8a80'; err.textContent = d.error || 'Ошибка'; busy = false; return; }
-        authSet(s, {u:d.u, t:d.token}); ov.remove(); setPName(d.u); (onOk || (() => connect(s)))();
-      }catch(e){ err.style.color = '#ff8a80'; err.textContent = 'Сервер недоступен (на бесплатном Render он просыпается до минуты) — нажмите ещё раз'; busy = false;
-        }
-    };
-    $$('au-l').onclick = () => go('login'); $$('au-r').onclick = () => go('register'); $$('au-c').onclick = () => ov.remove();
-    ov.addEventListener('keydown', e => { if(e.key === 'Enter') go('login'); e.stopPropagation(); }); ov.addEventListener('keyup', e => e.stopPropagation());
-    const lu = lastUser(); if(lu) $$('au-u').value = lu; setTimeout(() => $$(lu ? 'au-p' : 'au-u').focus(), 50);
+    /* окно входа — общий модуль OSIL_AUTH из loader.js (тот же вид, что на стартовом экране) */
+    OSIL_AUTH.open({base: baseUrl(s), note, skip: !force}).then(d => {
+      if(!d) return;
+      authSet(s, {u:d.u, t:d.token}); setPName(d.u); (onOk || (() => connect(s)))();
+    });
   }
   function getName(){
     let n = ''; try{ n = localStorage.getItem(LS_NAME) || ''; }catch(e){}
@@ -7164,11 +7135,11 @@ window.OSIL_NET = (function(){
     $('pm-exit').addEventListener('click', disconnect);
     window.__NIDL = harvestables.slice(); harvestables.forEach((h,i) => { h.nid = i; });
     mServers.length = 0; mSelServer = 0; mServers.push({name:'Одиночная игра', sub:'Без сервера', cur:1, max:1, ping:0, host:'', port:0, solo:true}); renderMenuServers();
-    {   // регистрация/вход сразу при открытии меню (закрыть нельзя)
+    {   // вход выполняется на стартовом экране (loader.js) ещё до меню; сюда приходит готовая сессия
       let u0 = null;
       try{ if(window.__SERVER){ const u = new URL(window.__SERVER); u0 = {host:u.hostname, port:+(u.port || (u.protocol === 'https:' ? 443 : 80))}; }
         else if(/^https?:$/.test(location.protocol) && location.hostname) u0 = {host:location.hostname, port:+(location.port || (location.protocol === 'https:' ? 443 : 80))}; }catch(e){}
-      if(u0){ u0.name = 'ANODE'; showAuth(u0, null, () => { refresh(); }, false); }
+      window.OSIL_NET_AUTH = d => { if(!d || !u0) return; u0.name = 'ANODE'; authSet(u0, {u:d.u, t:d.token}); setPName(d.u); refresh(); };
     }
     refresh(); setInterval(() => { const ss = $('start-screen'); if(ss && ss.style.display !== 'none' && !document.hidden) refresh(); }, 15000);
     setInterval(() => {                                       // отправка своего состояния 10 раз/с
