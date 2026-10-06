@@ -7,8 +7,8 @@
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#120d0b">
-<meta name="background-color" content="#120d0b">
+<meta name="theme-color" content="#0a1224">
+<meta name="background-color" content="#0a1224">
 
 <!-- iOS home screen app support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -109,6 +109,7 @@
       </div>
     </section>
   </main>
+  <div class="m-ver" id="m-ver"></div>
   <button class="m-play hide" id="start-btn"><i class="ic-play"></i>ИГРАТЬ</button>
 
 </div>
@@ -269,9 +270,11 @@
 <script src="js/tools3d.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/version.js"></script>
 <script src="js/loader.js"></script>
 <script src="js/register-sw.js"></script>
 <script>
+{ const v=document.getElementById('m-ver'); if(v&&window.__APP_VER) v.textContent='v'+window.__APP_VER; }
 /* главная вкладка меню: быстрое подключение, переключение панелей */
 (function(){
   const $=id=>document.getElementById(id), tabs=[...document.querySelectorAll('.m-tab[data-tab]')];
