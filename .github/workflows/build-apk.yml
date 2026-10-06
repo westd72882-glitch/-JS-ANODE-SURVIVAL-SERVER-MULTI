@@ -7,7 +7,7 @@ on:
       version:
         description: 'Версия игры (должна совпадать с version в serverconfig.txt сервера)'
         required: false
-        default: '1.0.0'
+        default: '16.9'
   push:
     branches: [main, master]
 jobs:
@@ -22,14 +22,14 @@ jobs:
       - name: Сборка веб-части (обфускация, шифрование ресурсов и кода)
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
-          APP_VERSION: ${{ github.event.inputs.version || vars.APP_VERSION || '1.0.0' }}
+          APP_VERSION: ${{ github.event.inputs.version || vars.APP_VERSION || '16.9' }}
           SERVER_URL: ${{ vars.SERVER_URL || 'https://js-anode-survival-server-multi.onrender.com' }}
         run: |
           npm i --no-save three@0.128.0 javascript-obfuscator@4
           mkdir -p ws/js && cp -r index.html css assets 1 ws/ && cp js/*.js ws/js/ && cp node_modules/three/build/three.min.js ws/
           SIG=""; [ -n "$APP_SECRET" ] && SIG=$(printf '%s' "$APP_VERSION:$APP_SECRET" | sha256sum | cut -d" " -f1)
-          sed -i "s/__APP_VER__/$APP_VERSION/g; s/__APP_SIG__/$SIG/g" ws/js/game.js
-          grep -c "$APP_VERSION" ws/js/game.js
+          sed -i "s/^window.__APP_VER=.*/window.__APP_VER='$APP_VERSION';/; s/^window.__APP_SIG=.*/window.__APP_SIG='$SIG';/" ws/js/version.js
+          grep -c "$APP_VERSION" ws/js/version.js
           for f in ws/js/*.js; do
             [ "$f" = "ws/js/register-sw.js" ] && continue
             npx javascript-obfuscator "$f" --output "$f" --compact true --string-array true --string-array-encoding base64 --string-array-threshold 0.75 --identifier-names-generator hexadecimal
