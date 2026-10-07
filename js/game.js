@@ -1931,7 +1931,7 @@ const GUNS = {
   berdanka:{mag:15, ammo:'ammo_rifle', dmg:35, rate:0.32, reload:2.6, snd:'ak', rate2:0.72, icon:'1/berdanka.webp', name:'ПОЛУАВТОМАТИЧЕСКАЯ ВИНТОВКА', semi:true},
   smg:    {mag:20, ammo:'ammo_pistol', dmg:18, rate:0.085, reload:1.9, snd:'ak', rate2:1.45, icon:'1/smg.webp', name:'ПИСТОЛЕТ-ПУЛЕМЁТ'},
   pistol: {mag:10, ammo:'ammo_pistol', dmg:25, rate:0.2,  reload:1.5, snd:'ak', rate2:1.7, icon:'1/pistol.webp', name:'ПИСТОЛЕТ'},
-  rpg:    {mag:1,  ammo:'rocket', dmg:150, rate:2.2, reload:3.2, snd:'ak', rate2:0.45, icon:'1/rpg.webp', name:'РПГ · РАКЕТА'}
+  rpg:    {mag:1,  ammo:'rocket', dmg:150, rate:2.2, reload:3.2, snd:'ak', rate2:0.45, icon:'1/rpg.webp', name:'РАКЕТНИЦА · РАКЕТА'}
 };
 const isGun = k => k==='rifle' || k==='pistol' || k==='berdanka' || k==='smg';
 const isMag = k => isGun(k) || k==='rpg';      // оружие с магазином, прицелом и перезарядкой (включая РПГ)
@@ -2354,7 +2354,7 @@ const ITEM_DEFS = {
   holo_sight:{name:'Голографический прицел', icon:'1/holo_sight.webp', stack:5, kind:'attach'},
   satchel: {name:'Сатчел-заряд',  icon:TEXTURES.icon_satchel, stack:5, kind:'gear'},
   grenade: {name:'Граната',       icon:'1/grenade.webp', stack:6, kind:'gear'},
-  rpg:     {name:'РПГ',           icon:'1/rpg.webp', stack:1, kind:'gear'},
+  rpg:     {name:'Ракетница',           icon:'1/rpg.webp', stack:1, kind:'gear'},
   rocket:  {name:'Ракета',        icon:'1/rocket.webp', stack:4, kind:'gear'},
   quarry:  {name:'Карьер',        icon:'1/quarry.webp', stack:1, kind:'gear'},
   furnace: {name:'Печка',          icon:TEXTURES.icon_furnace, stack:1, kind:'gear'},
@@ -2709,8 +2709,8 @@ const CRAFT_RECIPES = [
   { id:'box',     cat:'build', name:'Ящик', desc:'Хранилище на 20 ячеек. Ставится на фундамент или пол.', icon:ITEM_DEFS.box.icon, time:6, cost:{wood:60}, give:{item:'box'} },
   { id:'copter',  cat:'tools', name:'Миникоптер', desc:'Личный коптер: им управляете только вы. Возьмите в руки и нажмите «Удар», чтобы поставить. 100 HP: ломается от оружия, топора, кирки и столкновений.', icon:ITEM_DEFS.copter.icon, time:120, cost:{metal:200,scrap:50,gear:5,sheet:1}, give:{item:'copter'} },
   { id:'grenade', cat:'weapons', name:'Граната', desc:'Бросок по дуге, взрыв через 3.5 с. 50 урона постройкам рядом; игроков рядом тоже ранит.', icon:ITEM_DEFS.grenade.icon, time:4, cost:{metal:30,gunpowder:10,cloth:5}, give:{item:'grenade', amount:1} },
-  { id:'rpg',     cat:'weapons', name:'РПГ', desc:'Ракетница. Заряжается ракетами из сумки, по одному выстрелу. Ракета наносит 150 урона любой постройке и предмету в радиусе взрыва.', icon:ITEM_DEFS.rpg.icon, time:40, cost:{metal:200,gear:6,pipe:6,wood:50}, give:{item:'rpg', amount:1} },
-  { id:'rocket',  cat:'weapons', name:'Ракета', desc:'Боеприпас для РПГ. 150 урона постройкам, предметам и коптеру, ранит игроков рядом.', icon:ITEM_DEFS.rocket.icon, time:10, cost:{metal:40,gunpowder:50,pipe:2}, give:{item:'rocket', amount:1} },
+  { id:'rpg',     cat:'weapons', name:'Ракетница', desc:'Ракетница. Заряжается ракетами из сумки, по одному выстрелу. Ракета наносит 150 урона любой постройке и предмету в радиусе взрыва.', icon:ITEM_DEFS.rpg.icon, time:40, cost:{metal:200,gear:6,pipe:6,wood:50}, give:{item:'rpg', amount:1} },
+  { id:'rocket',  cat:'weapons', name:'Ракета', desc:'Боеприпас для ракетницы. 150 урона постройкам, предметам и коптеру, ранит игроков рядом.', icon:ITEM_DEFS.rocket.icon, time:10, cost:{metal:40,gunpowder:50,pipe:2}, give:{item:'rocket', amount:1} },
   { id:'furnace', cat:'build', name:'Печка', desc:'Плавит железную и серную руду в железо и серу. Топливо — дерево или топливо. Ставится на фундамент или пол.', icon:ITEM_DEFS.furnace.icon, time:6, cost:{stone:100,wood:50}, give:{item:'furnace'} },
   { id:'quarry',  cat:'build', name:'Карьер', desc:'Закиньте топливо — карьер сам добывает камень, железную и серную руду. Ставится на ровную землю (не на фундамент); пока работает — бур вращается.', icon:ITEM_DEFS.quarry.icon, time:12, cost:{wood:200,metal:150,gear:4,pipe:4}, give:{item:'quarry'} },
   { id:'plan',    cat:'build', name:'План строительства', desc:'Открывает режим строительства. Выберите в поясе и нажмите «Удар».', icon:ITEM_DEFS.plan.icon,  time:6,  cost:{wood:30,cloth:10},   give:{item:'plan'} },
@@ -4994,7 +4994,7 @@ function setPause(on){
 }
 fastTap(document.getElementById('btn-pause'), ()=>setPause(true));
 document.getElementById('pm-resume').addEventListener('click', ()=>setPause(false));
-document.getElementById('pm-map').addEventListener('click', ()=>{ setPause(false); toggleMap(true); });
+document.getElementById('pm-map').addEventListener('click', ()=>{ setPause(false); setTimeout(()=>{ try{ toggleMap(true); }catch(err){ console.error('map', err); mapOpen=false; try{ mapPanel.classList.remove('show'); }catch(_){} } }, 60); });
 document.getElementById('pm-settings').addEventListener('click', ()=>OSIL_SETTINGS.open());
 document.getElementById('pm-exit').addEventListener('click', ()=>{
   setPause(false);
@@ -5004,7 +5004,7 @@ document.getElementById('pm-exit').addEventListener('click', ()=>{
 });
 
 /* ---------------- Расположение управления (перетаскивание) ---------------- */
-const LAYOUT_KEY = 'osil_layout_v1';
+const LAYOUT_KEY = 'osil_layout_v2';
 const LAYOUT_IDS = ['btn-inspect','btn-hit','btn-aim','btn-reload','btn-jump','btn-run','btn-crouch','btn-inv','btn-craft','btn-map','btn-pause','ammo-hud','hotbar','hud-bars','minimap','fps-counter'];
 let layoutData = {};
 try{ layoutData = JSON.parse(localStorage.getItem(LAYOUT_KEY)||'{}') || {}; }catch(e){ layoutData = {}; }
@@ -5068,8 +5068,10 @@ function endLayout(){
   updateFpsVisibility();
 }
 /* раскладка «как на фото»: центры элементов в долях экрана 960×449 */
-const PHOTO_LAYOUT = {'btn-pause':[689,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],'btn-run':[771,222],'btn-jump':[802,329],'btn-crouch':[876,396],
-  'hud-bars':[108,47],'hotbar':[480,413],'fps-counter':[232,14],'minimap':[262,74],'btn-hit':[722,329],'btn-aim':[640,300],'btn-reload':[640,230],'ammo-hud':[737,419]};
+const PHOTO_LAYOUT = {'hud-bars':[108,47],'minimap':[262,74],'fps-counter':[480,12],
+  'btn-pause':[689,40],'btn-map':[766,40],'btn-craft':[843,40],'btn-inv':[920,40],
+  'btn-inspect':[715,130],'btn-run':[800,150],'btn-crouch':[905,225],'btn-reload':[715,205],'btn-aim':[715,280],
+  'btn-hit':[880,320],'btn-jump':[800,335],'hotbar':[480,413],'ammo-hud':[775,421]};
 function applyPhotoLayout(){
   const W = window.innerWidth, H = window.innerHeight; layoutData = {};
   const hadGun = document.body.classList.contains('has-gun'); document.body.classList.add('has-gun');
@@ -5167,7 +5169,7 @@ const BIOME_LABEL = {
 };
 let mapBase = null;   // offscreen canvas MB×MB: рельеф с затенением, береговая линия чёткая на любом зуме
 function buildMapBase(){
-  const MB = 1536, c = document.createElement('canvas'); c.width = c.height = MB;
+  const MB = 1024, c = document.createElement('canvas'); c.width = c.height = MB;
   const g = c.getContext('2d'), img = g.createImageData(MB,MB), d = img.data;
   const CR = new Float32Array(WN*WN), CG = new Float32Array(WN*WN), CB = new Float32Array(WN*WN);
   for(let k=0;k<WN*WN;k++){                       // цвет клетки; вода/пляж → цвет пляжа, чтобы у берега не мешалась вода

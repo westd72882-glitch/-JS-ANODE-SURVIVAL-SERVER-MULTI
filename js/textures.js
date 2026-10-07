@@ -30,7 +30,7 @@ TEXTURES.icon_scrap = "1/scrap.webp";
 TEXTURES.icon_gunpowder = "1/gunpowder.webp";
 TEXTURES.icon_axe = "1/axe.webp";
 TEXTURES.icon_pickaxe = "1/pickaxe.webp";
-TEXTURES.icon_furnace = "assets/images/Furnace_0.webp";
+TEXTURES.icon_furnace = "1/furnace.webp";
 TEXTURES.icon_wall    = "assets/images/Wall_Category.webp";
 TEXTURES.icon_crate   = "assets/images/Crate.webp";
 
@@ -60,4 +60,4 @@ TEXTURES.icon_box      = "assets/images/Crate.webp";
 
 TEXTURES.tex_iron = "assets/images/Iron_Plate.webp";           // листовое железо
 TEXTURES.tex_adoor = "assets/images/Armored_Door_Tex.webp";     // бронедверь
-TEXTURES.icon_adoor = "assets/images/Armored_Door_Icon.webp";   // иконка бронедвери
+TEXTURES.icon_adoor = "1/mvk_door.webp";   // иконка бронедвери
