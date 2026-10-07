@@ -1,0 +1,50 @@
+name: Build EXE (Windows)
+# Сборка ПК-версии (Electron): установщик NSIS и portable-exe. Без обфускации — скорость такая же, как у HTML-версии в Chrome.
+# Адрес сервера: переменная SERVER_URL (Settings → Variables), иначе используется адрес по умолчанию ниже.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия игры (должна совпадать с version в serverconfig.txt сервера)'
+        required: false
+        default: '16.9'
+jobs:
+  exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Подготовка веб-части
+        env:
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          APP_VERSION: ${{ github.event.inputs.version || vars.APP_VERSION || '16.9' }}
+          SERVER_URL: ${{ vars.SERVER_URL || 'https://js-anode-survival-server-multi.onrender.com' }}
+        run: |
+          npm i --no-save three@0.128.0
+          A=desktop/app; mkdir -p $A/js
+          cp -r index.html css assets 1 $A/ && cp js/*.js $A/js/ && cp node_modules/three/build/three.min.js $A/
+          rm -f $A/js/register-sw.js
+          sed -i '/register-sw.js/d' $A/index.html
+          SIG=""; [ -n "$APP_SECRET" ] && SIG=$(printf '%s' "$APP_VERSION:$APP_SECRET" | sha256sum | cut -d" " -f1)
+          sed -i "s/^window.__APP_VER=.*/window.__APP_VER='$APP_VERSION';/; s/^window.__APP_SIG=.*/window.__APP_SIG='$SIG';/" $A/js/version.js
+          grep -c "$APP_VERSION" $A/js/version.js
+          # адрес сервера внедряем до загрузки игры
+          sed -i "s#<script src=\"js/version.js\"></script>#<script>window.__SERVER='$SERVER_URL';</script>\n<script src=\"js/version.js\"></script>#" $A/index.html
+          grep -c "__SERVER" $A/index.html
+          cd desktop && npm pkg set version="$APP_VERSION.0"
+      - name: Electron Builder
+        working-directory: desktop
+        run: |
+          npm install
+          npx electron-builder --win --x64 --publish never
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ANODE-SURVIVAL-windows
+          path: |
+            desktop/dist/*.exe
+          if-no-files-found: error
