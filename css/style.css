@@ -1081,6 +1081,3 @@ input::selection,textarea::selection{ background:rgba(255,255,255,.25); }
 .set-foot{ border-top:1px solid var(--nv-line); }
 .set-reset{ background:transparent; border:1px solid var(--nv-line); color:var(--nv-ink); border-radius:0; letter-spacing:2px; }
 .set-reset:hover{ background:var(--nv-ink); color:#0a1224; }
-/* пауза-меню в игре */
-#pause-menu button{ background:transparent; border:1px solid var(--nv-line); border-radius:0; color:var(--nv-ink); letter-spacing:3px; font-weight:800; }
-#pause-menu button:hover,#pause-menu button:active{ background:var(--nv-ink); color:#0a1224; }
