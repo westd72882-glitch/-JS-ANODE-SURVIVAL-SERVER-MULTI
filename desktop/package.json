@@ -1,0 +1,21 @@
+{
+  "name": "anode-survival-desktop",
+  "version": "16.9.0",
+  "private": true,
+  "description": "ANODE SURVIVAL — ПК-версия",
+  "author": "ANODE",
+  "main": "main.js",
+  "scripts": { "start": "electron .", "dist": "electron-builder --win --x64 --publish never" },
+  "devDependencies": { "electron": "33.2.1", "electron-builder": "25.1.8" },
+  "build": {
+    "appId": "com.anode.survival",
+    "productName": "ANODE SURVIVAL",
+    "artifactName": "ANODE-SURVIVAL-${version}-${target}.${ext}",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "asar": true,
+    "compression": "normal",
+    "win": { "icon": "build/icon.png", "target": [ { "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] } ] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "deleteAppDataOnUninstall": false }
+  }
+}
