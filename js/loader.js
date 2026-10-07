@@ -108,7 +108,7 @@ window.OSIL_LOADER=(function(){
     $('ld-fill').style.width=(p*100)+'%'; $('ld-pct').textContent=Math.round(p*100)+'%';
     if(stage) $('ld-stage').textContent=stage; if(file!==undefined) $('ld-file').textContent=file;
   }
-  function show(){ el.classList.remove('out'); el.style.display='flex'; if(window.__preHide) window.__preHide(); tip(); clearInterval(tipT); tipT=setInterval(tip,2600); }
+  function show(){ el.querySelectorAll('.ld-spin,.ld-txt').forEach(n=>n.style.display=''); el.classList.remove('out'); el.style.display='flex'; if(window.__preHide) window.__preHide(); tip(); clearInterval(tipT); tipT=setInterval(tip,2600); }
   function hide(){ clearInterval(tipT); el.classList.add('out'); setTimeout(()=>{ el.style.display='none'; },500); }
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const frame=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
@@ -146,9 +146,7 @@ window.OSIL_LOADER=(function(){
     if(typeof THREE==='undefined'){
       set(0,'Ошибка: не загружен Three.js','Проверьте интернет и обновите страницу'); return;
     }
-    /* окно входа показываем сразу, пока в фоне идёт загрузка */
-    const base=authBase(); let authRes=null, authP=Promise.resolve();
-    if(base){ authP=OSIL_AUTH.open({base,skip:true}).then(d=>{ authRes=d; }); OSIL_AUTH.status('ЗАГРУЗКА ИГРЫ'); }
+    const base=authBase(); let authRes=null;
     const imgs=MENU_IMGS.slice(), snds=[];
     const W_SND=3, total=imgs.length+snds.length*W_SND+4; let done=0;
     const tick=(n,stage,file)=>{ done+=n; set(done/total,stage,file); };
@@ -168,12 +166,15 @@ window.OSIL_LOADER=(function(){
     /* net.js встроен в game.js */
     tick(3,'Готово','');
     set(1,'Готово','');
-    loadGameAssets();                                      // дальше тихо догружаем текстуры и звуки, пока игрок входит и сидит в меню
-    OSIL_AUTH.status('');
-    await authP;                                           // ждём, пока игрок войдёт (или нажмёт «Без входа»)
+    /* Сначала догружаем ВСЁ (текстуры, звуки) под экраном загрузки — окно входа появляется уже после этого */
+    _fast=true; try{ await loadGameAssets(); }catch(e){}
+    try{ await OSIL_AUDIO.load('night'); }catch(e){}
+    if(base){
+      const sp=el.querySelectorAll('.ld-spin,.ld-txt'); sp.forEach(n=>n.style.display='none'); // под окном входа ничего не крутится
+      authRes=await OSIL_AUTH.open({base,skip:true});
+    }
     try{ if(authRes&&window.OSIL_NET_AUTH) window.OSIL_NET_AUTH(authRes); }catch(e){}
-    await wait(350); hide();
-    OSIL_AUDIO.load('night'); // тихо догружаем ночную дорожку
+    clearInterval(tipT); el.style.display='none';          // сразу открываем меню — окно входа плавно растворяется поверх
   }
 
   /* Экран входа на остров (вызывается по кнопке ИГРАТЬ) */
