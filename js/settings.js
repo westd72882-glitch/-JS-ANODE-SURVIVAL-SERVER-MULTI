@@ -6,7 +6,7 @@ window.OSIL_SETTINGS=(function(){
     sens:10, invertY:false, joySize:100, btnSize:100,
     res:100, lighting:1, shadowFilter:1, texQ:4, aniso:4, waterQ:1, shadows:3, dist:200, fov:75, bob:100, water:true,
     volMaster:10, volSfx:10, volMusic:10, volSteps:10,
-    hudOn:true, fps:true, fpsCap:4, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0, ultra:false
+    hudOn:true, fps:true, fpsCap:4, shadowDist:120, minimap:false, miniSize:70, crosshair:true, hotbarSize:100, particles:true, camMode:0, platform:0, ultra:false, resH:0, winMode:0
   };
   const all=Object.assign({},DEF);
   try{ if(!localStorage.getItem('osil_res_fix')){ localStorage.setItem('osil_res_fix','1'); } }catch(e){}
@@ -46,6 +46,8 @@ window.OSIL_SETTINGS=(function(){
       {k:'ultra',t:'toggle',n:'УЛЬТРА-ОПТИМИЗАЦИЯ · 60 FPS',d:'Максимальная скорость на любом устройстве: минимальные тени, вода и частицы, меньше дальность, а разрешение само подстраивается под 60 FPS. Выключите — прежние настройки вернутся'},
       {t:'head',n:'Главное'},
       {k:'res',t:'range',n:'Разрешение картинки',d:'Ниже — быстрее на слабых телефонах',min:50,max:100,step:5,u:'%'},
+      {k:'resH',t:'seg',n:'Разрешение экрана',d:'Внутреннее разрешение картинки (ПК). «Родное» — по размеру окна. Ниже — больше FPS, выше — чётче (если окно меньше)',opts:['Родное','1080p','900p','720p','540p']},
+      {k:'winMode',t:'seg',n:'Режим окна (ПК)',d:'Оконный или полный экран. Переключить можно и клавишей F11',opts:['Окно','Полный экран']},
       {k:'fpsCap',t:'seg',n:'Лимит FPS',d:'Ставьте равным частоте экрана (90 Гц → 90, 120 Гц → 120) или «Без лимита» — так картинка идёт ровнее. 60 на экране 90 Гц даёт рывки',opts:['30','60','90','120','Без лимита']},
       {t:'preset',n:'Пресет графики',d:'Одним касанием выставляет разрешение, тени и дальность'},
       {t:'head',n:'Освещение и тени'},

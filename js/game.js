@@ -37,19 +37,37 @@ scene.fog = new THREE.Fog(0x8ec9e8, 34, 190);
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.02, 200);
 const IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent);
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));   // 100% родного разрешения экрана
+/* Масштаб рендера: «Родное» = по экрану; пресет 1080p/900p/720p/540p задаёт высоту картинки (только ПК); поверх — ползунок «Разрешение» */
+const RES_H = [0,1080,900,720,540];
+function renderPR(ud){
+  const dpr = Math.min(window.devicePixelRatio || 1, 3); let base = dpr;
+  const rh = RES_H[CFG.resH|0] || 0;
+  if(rh && !isMobile()){ const ih = (window.visualViewport ? window.visualViewport.height : window.innerHeight) || 1; base = Math.max(0.35, Math.min(2, rh/ih)); }
+  return base * Math.max(35, CFG.res + (ud||0))/100;
+}
+renderer.setPixelRatio(renderPR(0));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate = false;      // тени перерисовываем только при изменении (см. animate)
 let shadowDirty = true, shadowTimer = 0;
 document.getElementById('app').prepend(renderer.domElement);
+(function(){   // захват мыши: «сырой» ввод без ускорения Windows; повторный запрос при уже захваченной мыши игнорируем
+  const el = renderer.domElement, orig = el.requestPointerLock; if(!orig) return;
+  el.requestPointerLock = function(){
+    if(document.pointerLockElement === el) return Promise.resolve();
+    const quiet = r => { if(r && r.catch) r.catch(()=>{}); return r; };
+    try{ const r = orig.call(el, {unadjustedMovement:true}); if(r && r.catch) return r.catch(()=>{ try{ return quiet(orig.call(el)); }catch(_){} }); return r; }
+    catch(e){ try{ return quiet(orig.call(el)); }catch(_){} }
+  };
+})();
 OSIL_TOOLS.init(renderer);
 
 function fitScreen(){
   if(document.activeElement && document.activeElement.id==='net-chat-in') return;   // клавиатура чата не сжимает картинку
   const vv = window.visualViewport, w = Math.round(vv ? vv.width : window.innerWidth), h = Math.round(vv ? vv.height : window.innerHeight);
   camera.aspect = w/h; camera.updateProjectionMatrix();
+  if(CFG.resH){ try{ renderer.setPixelRatio(renderPR(CFG.ultra ? ultraDyn : 0)); }catch(e){} }   // фикс. разрешение зависит от размера окна
   renderer.setSize(w, h);                       // под реальный экран устройства, без рамок
   renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
 }
@@ -1719,7 +1737,7 @@ function openQuarry(id){
 }
 function closeQuarry(){
   quarOpenId = null; quEl.style.display = 'none'; updateFpsVisibility();
-  try{ if(!('ontouchstart' in window) && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
+  try{ if(!isMobile() && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
 }
 function quFuel(all){
   const id = quarOpenId; if(id === null) return;
@@ -1903,7 +1921,7 @@ function openFurnace(id){
 }
 function closeFurnace(){
   furOpenId = null; furEl.style.display = 'none'; updateFpsVisibility();
-  try{ if(!('ontouchstart' in window) && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
+  try{ if(!isMobile() && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
 }
 function closeWorldPanels(){ if(storOpenId !== null) closeStorage(); if(quarOpenId !== null) closeQuarry(); if(furOpenId !== null) closeFurnace(); }
 
@@ -3601,7 +3619,7 @@ function openStorage(id){
 }
 function closeStorage(){
   storOpenId = null; storEl.style.display = 'none'; updateFpsVisibility();
-  try{ if(!('ontouchstart' in window) && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
+  try{ if(!isMobile() && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
 }
 
 /* ---------------- Drag & Drop для ящика, шкафа, мешка/трупа и печки ---------------- */
@@ -3746,9 +3764,17 @@ window.addEventListener('keydown', e=>{
 
 /* ---------------- Input: keyboard ---------------- */
 const keys = {};
+const _typing = () => /INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');
+function releaseInput(){ for(const k in keys) keys[k]=false; attackHeld = false; aimHeld = false; }
+window.addEventListener('blur', releaseInput);                              // Alt+Tab: клавиши не залипают
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) releaseInput(); });
+document.addEventListener('pointerlockchange', ()=>{ if(!document.pointerLockElement) releaseInput(); });
 window.addEventListener('keydown', e=>{
+  if(_typing()) return;                                                      // печатаем в поле — игра не реагирует
+  if(e.code==='Space' || e.code==='Tab' || e.code.startsWith('Arrow')) e.preventDefault();
   keys[e.code]=true;
-  if(e.code==='Tab'){ e.preventDefault(); toggleInventory(); }
+  if(e.repeat) return;                                                       // удержание клавиши не дёргает переключатели
+  if(e.code==='Tab'){ toggleInventory(); }
   if(e.code==='KeyC' || e.code==='ControlLeft'){ toggleCrouch(); }
   if(e.code>='Digit1' && e.code<='Digit6'){ selectSlot(parseInt(e.code.slice(-1))-1); }
   if(e.code==='Space'){ jump(); }
@@ -3761,6 +3787,10 @@ window.addEventListener('keydown', e=>{
   if(e.code==='KeyY' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')) inspectItem();
 });
 window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+window.addEventListener('wheel', e=>{    // колесо мыши — смена слота хотбара
+  if(isMobile() || document.pointerLockElement !== renderer.domElement || !e.deltaY) return;
+  e.preventDefault(); const n = HOTBAR_N; selectSlot((selectedSlot + (e.deltaY>0?1:-1) + n) % n);
+},{passive:false});
 
 let attackHeld = false;
 renderer.domElement.addEventListener('mousedown', e=>{
@@ -3777,9 +3807,10 @@ renderer.domElement.addEventListener('click', ()=>{
 });
 document.addEventListener('mousemove', e=>{
   if(document.pointerLockElement === renderer.domElement){
-    const L = lookTarget();
-    L.yaw -= e.movementX * 0.0022 * (CFG.sens/5);
-    L.pitch -= e.movementY * 0.0022 * (CFG.sens/5) * (CFG.invertY?-1:1);
+    const L = lookTarget(), mx = e.movementX, my = e.movementY;
+    if(Math.abs(mx) > 400 || Math.abs(my) > 400) return;                     // известный баг захвата мыши: скачок камеры
+    L.yaw -= mx * 0.0022 * (CFG.sens/5);
+    L.pitch -= my * 0.0022 * (CFG.sens/5) * (CFG.invertY?-1:1);
     L.pitch = Math.max(-1.3, Math.min(1.3, L.pitch));
   }
 });
@@ -3788,7 +3819,10 @@ renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
 function isMobile(){
   const p = (window.OSIL_SETTINGS && OSIL_SETTINGS.all.platform) | 0;      // 0 авто, 1 ПК, 2 телефон
   if(p===1) return false; if(p===2) return true;
-  return 'ontouchstart' in window || navigator.maxTouchPoints>0;
+  if(window.__DESKTOP) return false;
+  if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
+  const touch = 'ontouchstart' in window || navigator.maxTouchPoints>0;
+  return touch && !(window.matchMedia && matchMedia('(any-pointer:fine)').matches);   // ноутбук с тачскрином и мышью = ПК
 }
 function applyPlatform(){ document.body.classList.toggle('plat-pc', !isMobile()); }
 applyPlatform();
@@ -6491,10 +6525,21 @@ function enterFullscreen(){
 
 // Полный экран всегда: браузер разрешает его только по жесту, поэтому при КАЖДОМ жесте
 // (меню, загрузка, игра), пока мы не в полноэкранном режиме, повторяем запрос.
+function applyWinMode(){
+  const want = CFG.winMode === 1, d = window.desktop;
+  if(d && d.setFullscreen){ d.setFullscreen(want); return; }
+  const fs = !!document.fullscreenElement;
+  try{ if(want && !fs) document.documentElement.requestFullscreen(); else if(!want && fs) document.exitFullscreen(); }catch(e){}
+}
+document.addEventListener('fullscreenchange', ()=>{          // F11 / Esc на ПК синхронизируют настройку
+  if(isMobile()) return; const fs = !!document.fullscreenElement;
+  if((CFG.winMode===1) !== fs) OSIL_SETTINGS.set('winMode', fs ? 1 : 0);
+});
+if(window.desktop && window.desktop.onFullscreen) window.desktop.onFullscreen(fs=>{ if(!isMobile() && (CFG.winMode===1)!==fs) OSIL_SETTINGS.set('winMode', fs?1:0); });
 // Слушатели постоянные — выход из fullscreen (свайп, Esc, сворачивание) возвращает его на следующем касании.
 (function(){
   const isFS = ()=> !!(document.fullscreenElement || document.webkitFullscreenElement) || window.matchMedia('(display-mode: fullscreen)').matches;
-  function again(){ if(!isFS()) enterFullscreen(); }
+  function again(){ if(isFS()) return; if(!isMobile() && CFG.winMode !== 1) return; enterFullscreen(); }
   ['pointerdown','touchstart','mousedown','pointerup','touchend','click','keydown'].forEach(e=>document.addEventListener(e,again,true));
   window.addEventListener('load', ()=>setTimeout(again,0)); setTimeout(again,300);
   document.addEventListener('fullscreenchange', ()=>{ if(!isFS()) setTimeout(again,0); });
@@ -6647,10 +6692,11 @@ function applyShadowFilter(){
 }
 function applySetting(k){
   const all = (k===null||k===undefined), on = n => all || k===n;
-  if(on('res')){
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 3) * Math.max(35, CFG.res + (CFG.ultra ? ultraDyn : 0))/100);
+  if(on('res') || on('resH')){
+    renderer.setPixelRatio(renderPR(CFG.ultra ? ultraDyn : 0));
     fitScreen();
   }
+  if(on('winMode') && !all && !isMobile()) applyWinMode();
   if(on('ultra')){ ultraDyn = 0; ultraLo = ultraHi = 0; if(!all) applySetting('res'); }
   if(on('texQ')||on('aniso')) applyTextures();
   if(on('shadowFilter')) applyShadowFilter();
@@ -7047,7 +7093,8 @@ window.OSIL_NET = (function(){
 
   const lastUser = () => { try{ return localStorage.getItem('anode_lastuser') || ''; }catch(e){ return ''; } };
   const hostPort = s => (s.port==443||s.port==80||!s.port) ? s.host : s.host + ':' + s.port;
-  const baseUrl = s => ((location.protocol === 'https:' && !/^(127\.|localhost)/.test(s.host)) ? 'https://' : 'http://') + hostPort(s);
+  const SECURE = window.__SERVER ? /^https:/i.test(window.__SERVER) : location.protocol === 'https:';   // exe/APK: схема берётся из адреса сервера
+  const baseUrl = s => ((SECURE && !/^(127\.|localhost)/.test(s.host)) ? 'https://' : 'http://') + hostPort(s);
   function setPName(n){ const e = document.getElementById('m-pName'); if(e && n) e.textContent = n; }
   let curSrv = null;
   function showAuth(s, note, onOk, force){
@@ -7069,7 +7116,7 @@ window.OSIL_NET = (function(){
   function connect(s){
     disconnect(); if(!s || s.solo) return;
     const au = authAll()[authKey(s)]; if(!au){ toast('Сначала войдите в аккаунт'); return; } curSrv = s;
-    const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + hostPort(s) + '/ws';
+    const url = (SECURE ? 'wss://' : 'ws://') + hostPort(s) + '/ws';
     let w; try{ w = new WebSocket(url); }catch(e){ toast('Неверный адрес сервера'); return; }
     ws = w;
     const to = setTimeout(()=>{ if(ws === w && !on){ toast('Сервер не отвечает'); disconnect(); backToMenu(); } }, 6000);
@@ -7269,7 +7316,7 @@ document.getElementById('dth-go').addEventListener('click', ()=>{
   _isDead = false; _bornAt = Date.now(); deathEl.style.display = 'none';
   if(window.OSIL_NET && OSIL_NET.resetDie) OSIL_NET.resetDie();
   try{ renderHotbar(); renderInvGrid(); refreshHeld(); updateResourceUI(); }catch(e){}
-  try{ if(!('ontouchstart' in window) && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
+  try{ if(!isMobile() && renderer.domElement.requestPointerLock) renderer.domElement.requestPointerLock(); }catch(e){}
 });
 
 })();
